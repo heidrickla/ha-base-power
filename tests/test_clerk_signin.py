@@ -189,6 +189,45 @@ async def test_a_sign_in_that_does_not_complete_is_an_error_not_a_silent_pass():
         await signin.async_finish(attempt, "123456")
 
 
+async def test_the_credential_is_also_taken_from_the_clerk_db_jwt_header():
+    """Which header carries the native client credential is the biggest
+    inference in this module. Authorization is what it was built against;
+    Clerk-Db-Jwt is a real alternative, because the app bundle carries that
+    exact header name. Accepting both removes a whole failure mode from the
+    one real sign-in anybody gets to run."""
+    session = FakeSession(
+        FakeResponse(200, created(), {"Clerk-Db-Jwt": "db_jwt_v1"}),
+        FakeResponse(200, {"response": {}}, {"Clerk-Db-Jwt": "db_jwt_v1"}),
+        FakeResponse(200, completed(), {"Clerk-Db-Jwt": "db_jwt_v2"}),
+    )
+    signin = ClerkSignIn(session)
+    attempt = await signin.async_start("someone@example.test")
+    assert await signin.async_finish(attempt, "123456") == "db_jwt_v2"
+
+
+async def test_a_bare_credential_without_the_bearer_prefix_is_accepted():
+    session = FakeSession(
+        FakeResponse(200, created(), {"Authorization": "raw_jwt"}),
+        FakeResponse(200, {"response": {}}, {"Authorization": "raw_jwt"}),
+        FakeResponse(200, completed(), {"Authorization": "raw_jwt"}),
+    )
+    signin = ClerkSignIn(session)
+    attempt = await signin.async_start("someone@example.test")
+    assert await signin.async_finish(attempt, "123456") == "raw_jwt"
+
+
+async def test_an_unmapped_error_code_is_logged_by_name(caplog):
+    """The mapping was read from Clerk's documented codes, not observed here,
+    so an unmapped one is the likeliest way this is wrong. The log has to name
+    the code, or diagnosing it costs the user another round trip."""
+    session = FakeSession(
+        FakeResponse(422, {"errors": [{"code": "form_code_not_allowed", "message": "nope"}]})
+    )
+    with pytest.raises(ClerkSignInError):
+        await ClerkSignIn(session).async_start("someone@example.test")
+    assert "form_code_not_allowed" in caplog.text
+
+
 async def test_completing_without_a_credential_is_refused():
     """A 'complete' with no Authorization header would otherwise store None
     and fail later, far from the cause."""

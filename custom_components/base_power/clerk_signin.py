@@ -126,9 +126,7 @@ class ClerkSignIn:
             headers["Authorization"] = f"Bearer {client_jwt}"
         async with self._session.post(self._url(path), data=data, headers=headers) as resp:
             body = await resp.json(content_type=None)
-            refreshed = resp.headers.get("Authorization") or client_jwt
-            if refreshed and refreshed.lower().startswith("bearer "):
-                refreshed = refreshed[7:]
+            refreshed = _credential_from(resp.headers) or client_jwt
             if resp.status == 429:
                 raise ClerkRateLimited(
                     "Clerk is rate-limiting sign-in for this account; wait before retrying"
@@ -195,6 +193,29 @@ class ClerkSignIn:
         return client_jwt
 
 
+def _credential_from(headers: Any) -> str | None:
+    """The client credential out of a Clerk response, from either header.
+
+    `Authorization` is the documented native-mode carrier and the one this
+    was built against. `Clerk-Db-Jwt` is checked as well because the app
+    bundle carries that exact header name alongside `__clerk_db_jwt`, so it
+    is a real alternative rather than a guess - and which one a given Clerk
+    version uses is the single biggest inference in this module. Accepting
+    both costs nothing and removes a whole failure mode from the first real
+    sign-in.
+    """
+    for name in ("Authorization", "Clerk-Db-Jwt"):
+        value = headers.get(name)
+        if not value:
+            continue
+        if value.lower().startswith("bearer "):
+            value = value[7:]
+        value = value.strip()
+        if value:
+            return value
+    return None
+
+
 def _email_factor_id(response: dict[str, Any]) -> str | None:
     """The email_address_id of the email_code factor, if the account has one."""
     for factor in response.get("supported_first_factors") or []:
@@ -227,4 +248,18 @@ def _error_for(body: Any, status: int) -> ClerkSignInError:
         return ClerkCodeExpired(detail)
     if code in ("too_many_requests", "rate_limit_exceeded"):
         return ClerkRateLimited(detail)
+
+    # An unmapped code is the likeliest way this module is wrong, because the
+    # mapping was read from Clerk's documented codes rather than observed on
+    # this instance. Log the code itself at warning: one failed sign-in then
+    # names the value needed to fix it, instead of costing another round trip
+    # through a user who has to request a fresh code to try again.
+    _LOGGER.warning(
+        "Clerk returned an unrecognised sign-in error (HTTP %s, code %r): %s. "
+        "If this was a wrong or expired code, that code belongs in "
+        "clerk_signin._error_for so the flow can respond properly",
+        status,
+        code or "<none>",
+        message or "<no message>",
+    )
     return ClerkSignInError(detail)
