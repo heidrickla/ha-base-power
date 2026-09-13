@@ -220,13 +220,16 @@ above. What is left:
    200 with nothing. Until this is understood, the grid-voltage and
    recent-power sensors are deliberately not built.
 
-   Ruled out: that the request is missing a field. `GetRecentPowerRequest`
-   takes `address_id` and nothing else, and the call is authorised (200, not
-   a permission error). Also worth knowing before reading the bundle for an
-   answer: the app ships a **mock layer** (`useMockContext`, `isMock`), and
-   the `getRecentPower` that is easiest to find in the bytecode is the mock
-   one - it manufactures samples with `Math.sin` over `Array.from({length})`.
-   Do not mistake it for the real client.
+   **Ruled out: that this client calls it differently from the app.** The
+   bundle has two `getRecentPower`s. The one that surfaces first is the app's
+   **mock** (`useMockContext` / `isMock`), which manufactures samples with
+   `Math.sin` over `Array.from({length})` - do not mistake it for the real
+   client. The real one (function #40185, and the same shape for
+   `getRecentGridVoltage` and `getDailyEnergy`) calls
+   `client.getRecentPower({ addressId })` and maps `samples`: **no time
+   window, no extra field, nothing the probe did not send.** The request is
+   also authorised, answering 200 rather than a permission error. So the
+   empty body is the server's answer for this site, not a malformed ask.
 
    **The decisive test costs nothing: open the usage/energy screen in the
    Base app.** If it shows recent power history, the emptiness is something
