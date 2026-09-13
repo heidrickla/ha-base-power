@@ -8,15 +8,31 @@ requires-python = ">=3.12"
 # Connect RPC, whose JSON codec needs no protobuf runtime, and the HTTP client
 # is the aiohttp session Home Assistant provides. These are for the tests only.
 [dependency-groups]
+# Runs anywhere, including Windows: enough for the tests/ suite and the
+# fallback mypy config below.
 dev = ["pytest", "pytest-asyncio", "mypy"]
+# The full suite. Linux only, and note the interpreter: every
+# pytest-homeassistant-custom-component from 0.13.317 requires Python >=3.14,
+# so on 3.13 pip silently resolves an OLD Home Assistant rather than refusing,
+# and you test against the wrong version without being told. 0.13.365 is Home
+# Assistant 2026.9.2, the version this runs on.
+ha = ["pytest-homeassistant-custom-component==0.13.365", "mypy==1.18.2"]
 
+# THIS IS THE FALLBACK CONFIG, not the real check.
+#
+# The check that counts runs on Linux with homeassistant installed and covers
+# all eleven modules:
+#
+#     mypy --strict custom_components/base_power
+#
+# What is configured below is the most that can be checked on a host WITHOUT
+# Home Assistant, which will not install on Windows (it needs fcntl). Four
+# modules, with the HA-facing ones silenced by name because their errors there
+# are missing-stub artefacts rather than findings. A green run from this config
+# says nothing about the other seven.
 [tool.mypy]
 python_version = "3.12"
 strict = true
-# Only the modules that import no Home Assistant can be checked off a host
-# without it installed; the HA-facing half needs HA's own stubs. See the
-# strict-typing entry in quality_scale.yaml for what that does and does not
-# cover.
 files = [
     "custom_components/base_power/api.py",
     "custom_components/base_power/clerk.py",
@@ -31,13 +47,15 @@ module = "homeassistant.*"
 ignore_missing_imports = true
 
 # The package __init__ imports the HA-facing modules, so mypy pulls them in
-# whether or not they are listed above. Every error it reports in them is an
-# artefact of homeassistant being absent - a base class that degraded to Any,
-# and returns inferred from it - not a finding.
+# whether or not they are listed above. Every error it reports in them HERE is
+# an artefact of homeassistant being absent - a base class that degraded to
+# Any, and returns inferred from it - not a finding.
 #
-# REMOVE THIS BLOCK once the checks run somewhere homeassistant is installed.
-# Until then it is the reason the HA layer reads green, and a green run here
-# says nothing at all about those seven modules.
+# These modules ARE checked, properly, by the Linux command at the top of this
+# section: all eleven pass --strict against Home Assistant 2026.9.2. This block
+# only stops a Windows run from drowning in noise it cannot act on. It is the
+# reason the HA layer reads green from THIS config, so never read a pass here
+# as coverage of those seven modules.
 [[tool.mypy.overrides]]
 module = [
     "base_power",

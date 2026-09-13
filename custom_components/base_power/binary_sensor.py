@@ -17,7 +17,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import BasePowerConfigEntry
+from .coordinator import BasePowerConfigEntry, BasePowerCoordinator
 from .entity import BasePowerEntity
 
 PARALLEL_UPDATES = 0
@@ -52,7 +52,7 @@ async def async_setup_entry(
 class BasePowerGridOutage(BasePowerEntity, BinarySensorEntity):
     """On while the API reports the grid down and the battery carrying."""
 
-    def __init__(self, coordinator, entry) -> None:
+    def __init__(self, coordinator: BasePowerCoordinator, entry: BasePowerConfigEntry) -> None:
         super().__init__(coordinator, entry)
         self.entity_description = GRID_OUTAGE
         self._attr_unique_id = f"{coordinator.address_id}_grid_outage"
@@ -72,7 +72,7 @@ class BasePowerOffGrid(BasePowerEntity, BinarySensorEntity):
     "am I running on battery at all" should not have to enumerate them.
     """
 
-    def __init__(self, coordinator, entry) -> None:
+    def __init__(self, coordinator: BasePowerCoordinator, entry: BasePowerConfigEntry) -> None:
         super().__init__(coordinator, entry)
         self.entity_description = OFF_GRID
         self._attr_unique_id = f"{coordinator.address_id}_off_grid"

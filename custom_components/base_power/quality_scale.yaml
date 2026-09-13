@@ -44,11 +44,34 @@ rules:
       shares (device info, availability rule), so the two platforms differ
       only in what they read off the snapshot.
   config-flow-test-coverage:
-    status: todo
+    status: done
     comment: |
-      No config-flow tests. They need a Home Assistant test harness, which
-      does not install on the Windows host this was built on - Home Assistant
-      requires fcntl. This is the largest single gap.
+      config_flow.py: 129 statements, 0 missed, 100%. Measured, not estimated.
+
+      32 tests in tests/ha/test_config_flow.py, and most of them are error
+      branches rather than the happy path, because this is the one part of the
+      integration a user drives by hand and the failure modes are expensive:
+      requesting a code sends a real email, and a wrong-code path that
+      silently re-requests is what rate-limits somebody's account.
+
+      What is pinned, beyond each step succeeding:
+
+      - a wrong code re-shows the SAME screen, so a retry does not request a
+        second code
+      - an expired or rate-limited code returns to the email step instead,
+        because retyping a dead code can never work
+      - each Clerk failure maps to its own message: unknown_email,
+        code_expired, too_many_requests, signin_failed, unknown. They tell the
+        user different things to do, so collapsing them would be the
+        difference between "use the other option" and "wait five minutes"
+      - invalid_auth vs cannot_connect, which decides whether someone
+        re-copies a credential or waits for Base to come back
+      - an account with a valid credential and no sites is no_locations, NOT
+        an auth failure
+      - a second entry for the same address id aborts as already_configured
+      - reauth reuses the stored email, and falls back to asking for one on an
+        entry created before it was stored
+      - the options flow refuses an interval outside 15-3600
   config-flow:
     status: done
     comment: |
@@ -174,38 +197,55 @@ rules:
       address when an older entry has none. The new credential is validated
       before it replaces the stored one.
   test-coverage:
-    status: todo
+    status: done
     comment: |
-      89 tests cover the pure layer - the snapshot state union, the power
-      flow's None-vs-zero distinction, capability parsing, the repair
-      threshold, error mapping, diagnostics redaction, the Clerk sign-in
-      state machine and the session-token provider - including fixtures
-      captured from the live API, and nested objects arriving as the wrong
-      type. The HA layer itself has NO tests, which is what keeps this todo.
+      136 tests, 96% of the component, against Home Assistant 2026.9.2 - the
+      version this actually runs on, not an approximation of it.
 
-      The session provider (clerk.py) had none at all until the strict-typing
-      pass found a crash in it, which is worth recording as a pattern: the
-      module with no tests was the module on the auth hot path, and nothing
-      flagged that until a type checker was pointed at it.
+        __init__      100%   config_flow   100%   entity      100%
+        binary_sensor 100%   const         100%   clerk       100%
+        sensor         98%   coordinator    94%   clerk_signin 96%
+        diagnostics    89%   api            88%
 
-      It is however now PROVEN TO LOAD AND TO READ CORRECTLY on real data.
-      A real entry on Home Assistant 2026.9.2 reached state=loaded with all
-      four platform modules imported and nine entities constructed, and once
-      the battery resumed reporting the values were cross-checked three ways:
-      the power flow balances to 0.000 kW (from_grid + from_storage =
-      to_home), the stored-energy derivation agrees with the independent
-      backup-at-current-usage figure to 0.4%, and to_home is within 1.9% of a
-      different vendor's whole-panel CTs on the same house. battery_state
-      read on_grid, both binary sensors off, state_of_charge unknown as the
-      on-grid contract requires, and the solar sensor stayed absent.
+      The remainder in api.py is the HTTP transport, exercised live rather
+      than mocked; see the live-confirmation notes in docs/API.md.
 
-      One gap remains, and it is narrower than it first looked: a negative
-      from_storage HAS been seen on the API - the 02:41 capture carries
-      -0.3 kW, the battery charging, and that response is a test fixture - but
-      no negative value has yet reached a Home Assistant sensor, because the
-      field has read positive since the entry was created. The signed-sensor
-      decision therefore rests on real data; only the end-to-end path for the
-      charging direction is unexercised.
+      TWO SUITES, DELIBERATELY SEPARATE, and the separation is the point:
+
+      tests/ imports the parsing layer BY PATH and runs with no Home Assistant
+      installed at all. That is not a workaround for a Windows host, it is the
+      check - if an HA import ever creeps into api.py or clerk.py, that suite
+      stops running and says so, which no amount of mocking would reveal.
+
+      tests/ha needs a real Home Assistant. The root conftest skips it when
+      the harness is absent and prints which half ran in the pytest header, so
+      a partial run cannot be mistaken for a full one.
+
+      What tests/ha pins is mostly ABSENCE, because that is where a wrong
+      guess is invisible - a plausible number reads exactly like a real one:
+
+      - no telemetry makes every value entity unavailable while battery_state
+        stays available to say why
+      - no solar sensor is CREATED at all on a site without solar
+      - state_of_charge is unknown while on grid, which is correct
+      - a failed poll goes unavailable rather than holding a stale kW figure
+      - the repair issue waits the full 30 minutes, driven by real polls at
+        the real interval rather than one clock jump, because the threshold is
+        a duration converted to a poll count and a single jump is one poll
+      - diagnostics carry no credential, no SSID and no address id, checked
+        through the real endpoint a user downloads
+      - an interval below the floor is raised to it even if .storage is edited
+        by hand
+
+      A NEGATIVE from_storage NOW REACHES A SENSOR: the 02:41 fixture carries
+      -0.3 kW and the entity reads -0.3. That was the last gap in the
+      signed-sensor decision and it is closed - the sensor is not clamping.
+
+      Still resting on live observation rather than tests: the three
+      cross-checks that say the numbers are real (power flow balancing to
+      0.000 kW, the stored-energy derivation to 0.4%, to_home within 1.9% of a
+      different vendor's CTs). Tests prove the code does what it means to;
+      only the live comparison proves the contract itself was read correctly.
 
   # Gold
   devices:
@@ -349,25 +389,39 @@ rules:
       async_get_clientsession throughout - the client, the config flow and
       the Clerk provider all take the shared session.
   strict-typing:
-    status: todo
+    status: done
     comment: |
-      Partly verified, and the split is worth stating exactly.
+      `mypy --strict` passes on all 11 modules, with Home Assistant installed
+      so its types actually resolve:
 
-      mypy --strict passes clean on the four modules that import no Home
-      Assistant at all - api, clerk, clerk_signin, const - which is where the
-      parsing lives and where a type error would be a real defect. It found
-      eleven, all genuine: ten possibly-None dict walks in api.py and one
-      Any-return in clerk_signin.py. Both are fixed, and one of them was a
-      live crash (a wrongly-typed `battery` key raised AttributeError through
-      LocationCapabilities.from_json, which runs at setup).
+        mypy==1.18.2 --strict custom_components/base_power
 
-      It has NOT been run over the HA-facing layer - __init__, coordinator,
-      config_flow, sensor, binary_sensor, entity, diagnostics. Home Assistant
-      is not installable on the host this was built on, so those imports do
-      not resolve and every HA base class degrades to Any; the three errors
-      mypy reports there (a subclass-of-Any and two Any-returns) are artefacts
-      of the missing stubs, not findings. Checking that half needs a Linux
-      environment with homeassistant installed.
+      The gate is PROVEN NON-VACUOUS in both halves: a planted
+      `def f(x: int) -> str: return x` was caught in api.py and again in
+      coordinator.py, the HA-facing module that could not be checked at all
+      before. A clean run that cannot fail is not a clean run.
 
-      To reproduce the part that is verified:
-        mypy --strict custom_components/base_power/{api,clerk,clerk_signin,const}.py
+      Fourteen real errors found and fixed, and they split in a way worth
+      recording:
+
+      - Eleven in the pure layer - ten possibly-None dict walks in api.py and
+        an Any-return in clerk_signin.py. ONE WAS A LIVE CRASH: a wrongly
+        typed `battery` key raised AttributeError through
+        LocationCapabilities.from_json, which runs at setup, so the failure
+        mode was a config entry that never finishes loading.
+      - Three in the HA layer, all the same shape: __init__ signatures in
+        sensor.py and binary_sensor.py that omitted the annotations their own
+        base class already had.
+
+      Checking this half at all needed Linux with homeassistant installed;
+      Home Assistant requires fcntl and will not install on Windows. Note the
+      interpreter constraint, which is easy to get wrong silently: every
+      pytest-homeassistant-custom-component from 0.13.317 requires Python
+      >=3.14, so on 3.13 pip resolves an OLD Home Assistant instead of
+      refusing, and you end up type-checking against the wrong version
+      without being told.
+
+      pyproject.toml still carries a narrower mypy config for running on
+      Windows - four modules, with the HA-facing ones silenced by name. That
+      exists so a partial check is possible where no full one can be, and its
+      comments say so; the command above is the one that means something.

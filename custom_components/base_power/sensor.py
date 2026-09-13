@@ -34,7 +34,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api import BatterySnapshot
 from .const import BACKUP_REFERENCE_KW
-from .coordinator import BasePowerConfigEntry
+from .coordinator import BasePowerConfigEntry, BasePowerCoordinator
 from .entity import BasePowerEntity
 
 PARALLEL_UPDATES = 0
@@ -175,7 +175,12 @@ class BasePowerSensor(BasePowerEntity, SensorEntity):
 
     entity_description: BasePowerSensorDescription
 
-    def __init__(self, coordinator, entry, description: BasePowerSensorDescription) -> None:
+    def __init__(
+        self,
+        coordinator: BasePowerCoordinator,
+        entry: BasePowerConfigEntry,
+        description: BasePowerSensorDescription,
+    ) -> None:
         super().__init__(coordinator, entry)
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.address_id}_{description.key}"
