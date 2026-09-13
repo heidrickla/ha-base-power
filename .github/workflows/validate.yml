@@ -24,13 +24,11 @@ concurrency:
   cancel-in-progress: true
 
 # Gitea's act_runner also picks up .github/workflows, so every job here is
-# gated to GitHub. On the gitea forge these skip and
-# .gitea/workflows/validate.yml is the one that runs - the runner is shared
-# with capacity 1 and duplicate jobs queue behind each other.
+# gated to GitHub.
 #
-# Ruff, the pure tests, the Home Assistant layer tests, mypy and the offline
-# validator run in tests.yml. This file is the publication side: hassfest and
-# the HACS action, which HACS requires green, plus the secret guard.
+# This file is the publication side: hassfest and the HACS action, which HACS
+# requires green, plus the secret guard. Ruff, the tests, mypy and the offline
+# validator run in tests.yml.
 jobs:
   hassfest: # https://developers.home-assistant.io/blog/2020/04/16/hassfest
     if: github.server_url == 'https://github.com'
