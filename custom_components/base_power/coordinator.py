@@ -124,23 +124,32 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
         self._silent_polls += 1
         if self._telemetry_available is not False:
             self._telemetry_available = False
-            # The battery's Wi-Fi status is deliberately NOT quoted here. It
-            # reads NOT_CONNECTED on a battery that is reporting perfectly
-            # well, because the unit also has a cellular link and uses it when
-            # Wi-Fi is down - so naming it alongside a telemetry fault invites
-            # exactly the wrong action, chasing a network that is not the
-            # transport. Base's own banner never mentions Wi-Fi either.
-            # Deliberately INFO, not WARNING. On a cellular-backed battery
-            # this happens routinely between reports, so a warning per gap
-            # would be noise - and a user reading "not reporting" as a fault
-            # would go chasing one that is not there. The distinction between
-            # a gap and a genuine blackout is not yet measurable here.
+            # This message used to steer people AWAY from the Wi-Fi, on the
+            # grounds that the battery reports over cellular anyway. That was
+            # wrong, and it cost a day: Wi-Fi is the normal transport at ~32 s
+            # between reports, cellular is the fallback at minutes, and the
+            # one real occurrence of this condition was an access point with
+            # its PoE injector unplugged. The Wi-Fi IS the thing to check.
+            #
+            # The live wifi_status is still not quoted, for a different and
+            # narrower reason: during a gap it reads UNAVAILABLE - the field
+            # is as stale as everything else in a snapshot nobody sent - so
+            # printing it would say nothing. The diagnostic sensor, which the
+            # user reads when the link is back, is the useful surface.
+            #
+            # Deliberately INFO, not WARNING. On a battery that has fallen
+            # back to cellular this fires between every report, so a warning
+            # per gap would be noise; the repair issue at 30 minutes is what
+            # escalates.
             _LOGGER.info(
                 "The Base Power battery has no current telemetry (state %s). "
                 "The connection to Base is fine - this poll succeeded - so "
-                "either the battery is between reports, which is normal on a "
-                "cellular connection, or it has stopped sending. Its entities "
-                "read unavailable rather than showing a stale value. Backup "
+                "the battery is either between reports or has stopped sending. "
+                "If this repeats, check the Wi-Fi access point the battery "
+                "associates with: on Wi-Fi it reports about every 32 seconds, "
+                "but it falls back to a cellular link that reports far less "
+                "often, and Base drops a snapshot once it goes stale. Entities "
+                "read unavailable rather than showing a stale value, and backup "
                 "during a grid outage is unaffected either way",
                 snapshot.state,
             )

@@ -71,20 +71,37 @@ length (the prefix is 31 characters, so `NOT_CONNECTED` is 44, `UNAVAILABLE`
 
 | when | telemetry | `wifi.status` | observed cadence |
 |---|---|---|---|
-| 02:41, `onGrid` with real power flows | flowing | 44 = `NOT_CONNECTED` | — |
+| 02:41, `onGrid` with real power flows | flowing | 40 = `CONNECTED` | — |
 | midday, `telemetryUnavailable` | absent | 42 = `UNAVAILABLE` | — |
-| 19:18 | available, snapshot already 4m51s stale | `NOT_CONNECTED` | cellular: **minutes** |
+| 19:18 | available, snapshot already 4m51s stale | 44 = `NOT_CONNECTED` | cellular: **minutes** |
 | evening, after the AP was restored | flowing | 40 = `CONNECTED`, `wifi_ssid_present` true | Wi-Fi: **32 seconds** |
 
-**Draft one said: check the Wi-Fi.** Then telemetry was seen flowing with
-`wifi.status = NOT_CONNECTED`, twice, either side of the gap.
+Every row now agrees with the others: telemetry flows freely when Wi-Fi is
+`CONNECTED`, and the one degraded sample is the one where it is not.
 
-**Draft two therefore said `wifi_status` is not a telemetry diagnostic at all
-and must not be presented as one. That was the bigger mistake.** The
-observation behind it was real; the inference drawn from it was too wide. "The
-battery can report without Wi-Fi" is not the same claim as "Wi-Fi is
-irrelevant to whether it reports", and the first does not establish the
-second.
+**Draft one said: check the Wi-Fi.**
+
+**Draft two said `wifi_status` is not a telemetry diagnostic at all and must
+not be presented as one.** It justified that with "the battery reported
+perfectly well while its Wi-Fi was not connected, on two separate occasions",
+and cited the 02:41 capture as one of them.
+
+**The 02:41 capture says `CONNECTED`.** It is a pinned test fixture, captured
+straight off the live API in 3bf6b09 and never edited since, and it reads
+`BATTERY_WIFI_CONNECTION_STATUS_CONNECTED`. Draft two recorded it as
+`NOT_CONNECTED` in this very table — a value inferred from string length
+rather than read off the capture sitting in the repo. So one of its two
+occasions never happened, and the surviving one (19:18, a snapshot already
+4m51s stale) is the cellular-fallback sample, which supports the opposite
+conclusion.
+
+That is the failure worth naming: **the contradicting evidence was already in
+the repository, pinned, and was not read.** Draft two reasoned from a
+reconstruction of the data when the data itself was one file away. The
+inference was also too wide — "the battery can report without Wi-Fi" does not
+establish "Wi-Fi is irrelevant to whether it reports" — but the wideness of
+the inference is the smaller problem. It was built on a fact that was not a
+fact.
 
 **What actually happened**: the access point the battery associates with had
 its PoE injector unplugged on the *ethernet* side, so the AP looked powered
