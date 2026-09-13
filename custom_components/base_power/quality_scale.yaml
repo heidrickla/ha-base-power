@@ -121,7 +121,14 @@ rules:
       README documents the one option - poll interval, its default, floor and
       ceiling, and that changing it reloads the entry.
   docs-installation-parameters:
-    status: todo
+    status: done
+    comment: |
+      README's Setting it up section documents everything a user supplies:
+      the email address on the Base account and the six-digit code, which is
+      all the normal path asks for. The fallback path's one parameter - the
+      __client cookie - is documented with where to find it and which cookie
+      it is NOT (__session, which expires in about a minute). Nothing else is
+      entered: the site and its address id are discovered.
   entity-unavailable:
     status: done
     comment: |
@@ -280,10 +287,19 @@ rules:
       grid, a struck-through tower for an outage, a flash-alert for
       overcurrent.
   reconfiguration-flow:
-    status: todo
+    status: exempt
     comment: |
-      Only reauth exists. There is nothing else to reconfigure yet - the
-      address is discovered, not entered.
+      There is nothing a reconfigure flow could change. The only value in
+      entry.data that a user supplied is the credential, and replacing that
+      is precisely the reauthentication flow, which exists and re-runs the
+      same emailed-code sign-in. The address id is discovered rather than
+      entered, so it cannot be edited into something else meaningfully - a
+      different site is a different entry, guarded by the unique id. The poll
+      interval is an option, and options already have their own flow.
+
+      Marked exempt rather than todo because this is not deferred work: a
+      reconfigure step here would either duplicate reauth or offer to edit a
+      value the integration derives for itself.
   repair-issues:
     status: done
     comment: |
