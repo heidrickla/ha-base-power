@@ -104,10 +104,25 @@ class ClerkSessionProvider:
                     f"Clerk refused the stored credential (HTTP {resp.status}); "
                     "sign in again to renew it"
                 )
-        response = body.get("response") or body
-        sessions = response.get("sessions") or []
-        active = next((s for s in sessions if s.get("status") == "active"), None)
-        if not active or not active.get("id"):
+        # Every step here degrades to "no active session" rather than walking
+        # into whatever shape arrived. The failure that matters is not a
+        # malformed response - it is raising AttributeError instead of
+        # ClerkAuthError, because only ClerkAuthError starts reauthentication.
+        # Anything else surfaces as an unexpected error and the user is never
+        # asked to sign in again.
+        nested = body.get("response")
+        response = nested if isinstance(nested, dict) else body
+        raw_sessions = response.get("sessions")
+        sessions = raw_sessions if isinstance(raw_sessions, list) else []
+        active = next(
+            (
+                s
+                for s in sessions
+                if isinstance(s, dict) and s.get("status") == "active" and s.get("id")
+            ),
+            None,
+        )
+        if active is None:
             raise ClerkAuthError(
                 "the stored credential has no active session; sign in again"
             )

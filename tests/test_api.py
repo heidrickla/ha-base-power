@@ -26,6 +26,7 @@ from api import (  # noqa: E402
     Location,
     PowerFlow,
     _error_for,
+    _samples,
 )
 
 
@@ -257,6 +258,26 @@ def test_locations_yield_the_address_id_everything_else_needs():
 
 def test_no_locations_is_an_empty_list():
     assert Location.list_from_json({}) == []
+
+
+# ------------------------------------------------------------------- usage samples
+
+
+@pytest.mark.parametrize(
+    "data",
+    [{}, {"samples": None}, {"samples": "abc"}, {"samples": 7}, {"samples": {}}],
+    ids=["absent", "null", "a-string", "a-number", "an-object"],
+)
+def test_a_usage_response_without_a_sample_list_is_empty_not_a_crash(data):
+    """`list(data.get("samples") or [])` raised TypeError on the number and,
+    worse, turned the string into three one-character entries handed back past
+    a signature promising dicts. mypy sees none of this: the value is Any, and
+    Any is iterable as far as it knows."""
+    assert _samples(data) == []
+
+
+def test_non_dict_entries_are_dropped_rather_than_returned():
+    assert _samples({"samples": [{"w": 1}, "junk", None, {"w": 2}]}) == [{"w": 1}, {"w": 2}]
 
 
 # ----------------------------------------------------------------- error mapping

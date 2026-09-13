@@ -166,7 +166,7 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
             snapshot = await self.client.get_snapshot(self.address_id)
             self._note_telemetry(snapshot)
             return snapshot
-        except BasePowerAuthError as err:
+        except BasePowerAuthError:
             # The API refused the token. A minted token can simply have aged
             # out mid-flight, so give the credential one chance to prove it
             # is still good before sending the user to re-authenticate -

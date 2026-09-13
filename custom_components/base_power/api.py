@@ -306,11 +306,30 @@ class BasePowerClient:
 
     async def get_recent_power(self, address_id: str) -> list[dict[str, Any]]:
         data = await self.call("UsageService", "GetRecentPower", {"addressId": address_id})
-        return list(data.get("samples") or [])
+        return _samples(data)
 
     async def get_recent_grid_voltage(self, address_id: str) -> list[dict[str, Any]]:
         data = await self.call("UsageService", "GetRecentGridVoltage", {"addressId": address_id})
-        return list(data.get("samples") or [])
+        return _samples(data)
+
+
+def _samples(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """The sample list out of a usage response, dicts only.
+
+    `list(data.get("samples") or [])` looked equivalent and is not: it raises
+    TypeError on a non-iterable, and on a string it returns the right TYPE
+    holding the wrong THING - list("abc") is three strings, handed back past a
+    signature promising dicts. mypy cannot see either, because the value is
+    Any and Any is iterable as far as it knows.
+
+    These are the two methods that return empty for the site this was built
+    against, so their populated shape has never been observed and the
+    annotation is a guess until it has been.
+    """
+    samples = data.get("samples")
+    if not isinstance(samples, list):
+        return []
+    return [s for s in samples if isinstance(s, dict)]
 
 
 def _error_for(status: int, body: Any) -> BasePowerError:
