@@ -219,6 +219,19 @@ above. What is left:
 1. **Why `UsageService` returns no samples.** Both read-only methods answer
    200 with nothing. Until this is understood, the grid-voltage and
    recent-power sensors are deliberately not built.
+
+   Ruled out: that the request is missing a field. `GetRecentPowerRequest`
+   takes `address_id` and nothing else, and the call is authorised (200, not
+   a permission error). Also worth knowing before reading the bundle for an
+   answer: the app ships a **mock layer** (`useMockContext`, `isMock`), and
+   the `getRecentPower` that is easiest to find in the bytecode is the mock
+   one - it manufactures samples with `Math.sin` over `Array.from({length})`.
+   Do not mistake it for the real client.
+
+   **The decisive test costs nothing: open the usage/energy screen in the
+   Base app.** If it shows recent power history, the emptiness is something
+   about how this client calls it. If the app is equally empty, the data
+   genuinely is not there for this site and no integration can invent it.
 2. **How long a `__client` credential lasts** before Clerk ends the session.
    Unknown, so the integration raises a reauth flow rather than assuming.
 3. **`GetDailyEnergy` has never been called.** It takes a service period, so
