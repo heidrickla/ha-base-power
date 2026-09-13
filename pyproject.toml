@@ -1,0 +1,21 @@
+[project]
+name = "ha-base-power"
+version = "0.1.0"
+description = "Home Assistant integration for Base Power home batteries"
+requires-python = ">=3.12"
+
+# The integration itself declares no requirements (manifest.json): the API is
+# Connect RPC, whose JSON codec needs no protobuf runtime, and the HTTP client
+# is the aiohttp session Home Assistant provides. These are for the tests only.
+[dependency-groups]
+dev = ["pytest", "pytest-asyncio"]
+
+[tool.pytest.ini_options]
+# The Clerk sign-in and API clients are async, and their tests are plain async
+# functions rather than each carrying a marker.
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

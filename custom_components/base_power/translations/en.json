@@ -3,27 +3,52 @@
     "step": {
       "user": {
         "title": "Base Power",
-        "description": "Base Power signs in with an emailed code or a social login, so there is no password to enter here. Sign in at https://account.basepowercompany.com/sign-in, then copy the value of the `__client` cookie for that site (DevTools → Application → Cookies) and paste it below. It is long-lived; Home Assistant uses it to mint short-lived tokens the same way the mobile app does.",
+        "description": "How would you like to sign in?",
+        "menu_options": {
+          "email": "Sign in with an emailed code",
+          "manual": "Paste a credential from the browser (advanced)"
+        }
+      },
+      "email": {
+        "title": "Sign in to Base Power",
+        "description": "Base Power has no password. Enter the email address on your Base account and they will send you a six-digit code.",
+        "data": {
+          "email": "Email address"
+        }
+      },
+      "code": {
+        "title": "Enter your code",
+        "description": "Base Power emailed a six-digit code to {email}. It expires after a few minutes.",
+        "data": {
+          "code": "Code"
+        }
+      },
+      "manual": {
+        "title": "Paste a credential",
+        "description": "Only needed if the emailed code does not work — for example an account that signs in with Google or Apple, or one with two-factor authentication. Sign in at https://account.basepowercompany.com/sign-in, then copy the value of the `__client` cookie for that site (DevTools → Application → Cookies). Use `__client`, not `__session`: the latter expires after about a minute.",
         "data": {
           "client_jwt": "Clerk client credential (__client cookie)"
         }
       },
       "reauth_confirm": {
-        "title": "Base Power needs signing in again",
-        "description": "The stored credential is no longer accepted, which happens when the Clerk session ends or is revoked. Sign in again at https://account.basepowercompany.com/sign-in and paste a fresh `__client` cookie value.",
-        "data": {
-          "client_jwt": "Clerk client credential (__client cookie)"
-        }
+        "title": "Sign in to Base Power again",
+        "description": "The stored credential is no longer accepted, which happens when the Base Power session ends or is revoked. Continue and a fresh code will be emailed to {email}."
       }
     },
     "error": {
-      "invalid_auth": "Base Power rejected that credential. Check it was copied whole, and that it is the `__client` cookie rather than `__session` (which expires after about a minute).",
+      "unknown_email": "No Base Power account was found for that email address.",
+      "invalid_code": "That code was not correct. Check the email and try again — the code is still valid.",
+      "code_expired": "That code has expired or has been tried too many times. Start again to get a new one.",
+      "too_many_requests": "Base Power is temporarily refusing sign-in attempts for this account. Wait a few minutes before trying again.",
+      "signin_failed": "Sign-in could not be completed. If this account uses Google, Apple or two-factor authentication, go back and use the paste option instead.",
+      "invalid_auth": "Base Power rejected that credential. Check it was copied whole, and that it is the `__client` cookie rather than `__session`.",
       "cannot_connect": "Could not reach the Base Power API.",
-      "no_locations": "That credential works, but the account has no sites on it.",
+      "no_locations": "That account signed in, but has no sites on it.",
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "That site is already set up."
+      "already_configured": "That site is already set up.",
+      "reauth_successful": "Base Power was signed in again."
     }
   },
   "options": {
