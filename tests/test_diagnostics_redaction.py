@@ -43,7 +43,14 @@ def _snapshot_diagnostics(snapshot):
 SNAPSHOT = BatterySnapshot.from_json(
     {
         "snapshot": {
-            "wifi": {"ssid": "ExampleNet-5G", "status": "BATTERY_WIFI_CONNECTION_STATUS_CONNECTED"},
+            # Deliberately a fake name. This file exists to prove an SSID
+            # never reaches a diagnostics report; shipping a real household's
+            # network name as the fixture would undo the point in the one
+            # place that argues it.
+            "wifi": {
+                "ssid": "ExampleNet-5G",
+                "status": "BATTERY_WIFI_CONNECTION_STATUS_CONNECTED",
+            },
             "onGrid": {
                 "observedAt": "2026-09-13T02:41:09.000Z",
                 "powerFlow": {"fromGridKw": 2.9, "fromStorageKw": -0.3, "toHomeKw": 2.6},

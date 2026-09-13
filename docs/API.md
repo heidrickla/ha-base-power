@@ -453,8 +453,8 @@ above. What is left:
 
 ## Where the source artefacts are kept
 
-Deliberately **outside this repo**, at `<artifacts-dir>\artifacts\` on the
-workstation, so re-analysis never needs the phone plugged in again:
+Deliberately **outside this repo**, in a gitignored working directory on the
+analysis machine, so re-analysis never needs the phone plugged in again:
 
 | file | |
 |---|---|
@@ -469,9 +469,10 @@ They are not committed: the repo holds the *derived* contract (`proto/`,
 not kept - `hbc-disassembler` regenerates it from the APK in a couple of
 minutes.
 
-The tooling that produced them: `jadx` 1.5.6, and a venv at
-`<artifacts-dir>\venv` with `hermes-dec`, `androguard` and `protobuf` (a short
-path, because Windows MAX_PATH rejects a deep scratchpad install).
+The tooling that produced them: `jadx` 1.5.6, and a venv with `hermes-dec`,
+`androguard` and `protobuf`. On Windows, put that venv at a **short** path -
+MAX_PATH rejects a deep scratchpad install partway through, which looks like a
+broken package rather than a path-length problem.
 
 ## How to reproduce this
 
