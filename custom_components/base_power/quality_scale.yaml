@@ -176,9 +176,13 @@ rules:
       read on_grid, both binary sensors off, state_of_charge unknown as the
       on-grid contract requires, and the solar sensor stayed absent.
 
-      One thing remains unobserved: a NEGATIVE from_storage. It has read
-      positive throughout, so the charging direction - the reason that sensor
-      is signed rather than two sensors - is still untested on real data.
+      One gap remains, and it is narrower than it first looked: a negative
+      from_storage HAS been seen on the API - the 02:41 capture carries
+      -0.3 kW, the battery charging, and that response is a test fixture - but
+      no negative value has yet reached a Home Assistant sensor, because the
+      field has read positive since the entry was created. The signed-sensor
+      decision therefore rests on real data; only the end-to-end path for the
+      charging direction is unexercised.
 
   # Gold
   devices:

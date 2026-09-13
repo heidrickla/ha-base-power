@@ -41,5 +41,21 @@ ISSUE_TELEMETRY_UNAVAILABLE = "telemetry_unavailable"
 # minutes at the 30 s default but over an hour and a half at the 3600 s
 # maximum. So the threshold is a DURATION, converted to polls against
 # whatever interval is configured, with at least two polls always required.
-TELEMETRY_GRACE = timedelta(minutes=5)
+# **Thirty minutes, set by the owner**, and the number matters as much as the
+# shape. The first attempt at five minutes was calibrated against the wrong
+# process entirely and would have fired constantly on a healthy battery.
+#
+# `telemetry_available` does NOT mean "the battery is fine". It means "a
+# recent-enough snapshot exists", and this battery reports over CELLULAR - its
+# Wi-Fi reads NOT_CONNECTED while it reports perfectly well. That path reports
+# infrequently and the API appears to drop a snapshot once it goes stale
+# rather than serving it indefinitely: measured on a healthy unit, a snapshot
+# already 4m51s old at 19:18Z and `telemetry_available` false by 19:23Z. The
+# flag therefore oscillates in normal service.
+#
+# Thirty minutes sits in the gap between the two processes - well above the
+# ~10-minute cellular cadence, well below the multi-hour absence Base's own
+# app flagged - which is what keeps a WARNING that says "contact Base Support"
+# rare enough to mean something.
+TELEMETRY_GRACE = timedelta(minutes=30)
 MIN_TELEMETRY_POLLS = 2

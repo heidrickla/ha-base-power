@@ -9,12 +9,21 @@ so.
 
 ## `telemetry_unavailable` observed, 2026-09-13
 
-The first real setup found the site answering with **no telemetry at all**:
+The first real setup found the site answering with **no current telemetry**:
 `GetSnapshot` returns the `telemetry_unavailable` variant, every `power_flow`
 field null, and `wifi.status = BATTERY_WIFI_CONNECTION_STATUS_UNAVAILABLE`.
 The poll itself is healthy — `last_update_success` true, no exception — so
-this is the service reporting that the battery is not talking to it, not a
-client fault.
+whatever this is, it is not a client fault.
+
+**What it is remains open, and the phrasing here is deliberately careful.**
+What was *observed* is that the snapshot was stale beyond whatever threshold
+the API applies. Whether the battery had genuinely stopped, or had merely not
+reported recently enough, is **not settled** — the same site was later seen
+flipping `telemetry_available` to false within about ten minutes of a good
+reading, in normal service, because it reports over cellular. Base's own "No
+battery data" banner may be surfacing that same staleness rather than a
+defect. So this document says *stale*, not *broken*, and an earlier draft that
+called it a blackout was claiming more than the evidence carries.
 
 Two things that matters for:
 
@@ -31,8 +40,8 @@ Your battery is not currently sending data. Don't worry—in the event of a grid
 outage, it will still provide power to your home." So two independent sources
 agree, and one of them is the vendor. That also settles something worth
 stating in the integration: **telemetry loss is not backup loss.** The battery
-still carries the house through an outage while dark, and the entities going
-unavailable must not be read as "no protection".
+still carries the house through an outage while it is not reporting, and the
+entities going unavailable must not be read as "no protection".
 
 **Telemetry returned the same day**, and the recovery is what proved the
 point below. Measured live at 19:13 UTC: `telemetry_available` true, a current
@@ -59,7 +68,7 @@ and the strings are separable by length (the prefix is 31 characters, so
 The battery reported perfectly well while its Wi-Fi was **not connected**, on
 two separate occasions either side of the outage, so Wi-Fi is not the
 telemetry transport — the cellular link is. The field moving to `UNAVAILABLE`
-during the gap is a second symptom of the same blackout, not its cause. The
+during the gap accompanies the staleness rather than causing it. The
 actionable advice is Base Support, which is exactly what Base's own banner
 says and why its wording is better than the obvious guess.
 
@@ -80,9 +89,24 @@ That third one is the strongest evidence available that these are real
 measurements rather than plausible-looking garbage, because nothing in this
 integration's code path touches the Emporia figure.
 
-**Still not observed:** a *negative* `from_storage`. It has read positive
-(discharging) throughout, so the charging direction — the reason that sensor
-is signed — remains untested on real data.
+**A caveat on any cadence numbers quoted later.** From 2026-09-13 evening the
+owner was adding Wi-Fi to the battery, and Base's own UI warns the unit may
+disconnect during that process. Any telemetry gap measured in that window is a
+radio being reconfigured, not evidence about normal cellular cadence. The two
+samples above (19:18 available with a 4m51s-stale snapshot, 19:23
+unavailable) predate the work and stand; nothing measured during it should be
+cited as service behaviour.
+
+**A negative `from_storage` HAS been observed — on the API, not yet through an
+entity.** The 02:41 capture below carries `fromStorageKw: -0.3`, the battery
+charging from grid, and that exact response is pinned as a test fixture. What
+has *not* happened is a negative value reaching a Home Assistant sensor: since
+the entry was created the field has read positive throughout.
+
+So the signed-sensor decision rests on real data — the wire genuinely carries
+both signs — while the end-to-end path for a negative value is still
+unexercised. Those are different claims and it is worth not collapsing them,
+in either direction.
 
 ## Confirmed live, 2026-09-13
 

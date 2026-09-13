@@ -141,13 +141,18 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
             # Wi-Fi is down - so naming it alongside a telemetry fault invites
             # exactly the wrong action, chasing a network that is not the
             # transport. Base's own banner never mentions Wi-Fi either.
-            _LOGGER.warning(
-                "The Base Power battery is not reporting telemetry (state %s). "
-                "The connection to Base is fine - this poll succeeded - so the "
-                "battery itself is not sending data, and its entities are "
-                "unavailable rather than showing a stale or zero reading. "
-                "Backup during a grid outage is unaffected. If it does not "
-                "clear, contact Base Support",
+            # Deliberately INFO, not WARNING. On a cellular-backed battery
+            # this happens routinely between reports, so a warning per gap
+            # would be noise - and a user reading "not reporting" as a fault
+            # would go chasing one that is not there. The distinction between
+            # a gap and a genuine blackout is not yet measurable here.
+            _LOGGER.info(
+                "The Base Power battery has no current telemetry (state %s). "
+                "The connection to Base is fine - this poll succeeded - so "
+                "either the battery is between reports, which is normal on a "
+                "cellular connection, or it has stopped sending. Its entities "
+                "read unavailable rather than showing a stale value. Backup "
+                "during a grid outage is unaffected either way",
                 snapshot.state,
             )
 
