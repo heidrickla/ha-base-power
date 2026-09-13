@@ -46,17 +46,26 @@ ISSUE_TELEMETRY_UNAVAILABLE = "telemetry_unavailable"
 # process entirely and would have fired constantly on a healthy battery.
 #
 # `telemetry_available` does NOT mean "the battery is fine". It means "a
-# recent-enough snapshot exists", and this battery reports over CELLULAR - its
-# Wi-Fi reads NOT_CONNECTED while it reports perfectly well. That path reports
-# infrequently and the API appears to drop a snapshot once it goes stale
-# rather than serving it indefinitely: measured on a healthy unit, a snapshot
-# already 4m51s old at 19:18Z and `telemetry_available` false by 19:23Z. The
-# flag therefore oscillates in normal service.
+# recent-enough snapshot exists", and how recent depends entirely on which
+# LINK the battery is using. It reports over Wi-Fi when it can and falls back
+# to cellular when it cannot, and both were measured on the same healthy unit
+# on the same day:
 #
-# Thirty minutes sits in the gap between the two processes - well above the
-# ~10-minute cellular cadence, well below the multi-hour absence Base's own
-# app flagged - which is what keeps a WARNING that says "contact Base Support"
-# rare enough to mean something.
+#   Wi-Fi     32 seconds between successive observations
+#   cellular  a snapshot already 4m51s old at 19:18Z, and
+#             `telemetry_available` false by 19:23Z
+#
+# The API drops a snapshot once it goes stale rather than serving it
+# indefinitely, so on cellular the flag oscillates in ordinary service. On
+# Wi-Fi it essentially does not.
+#
+# Thirty minutes sits above even the cellular cadence and well below the
+# multi-hour absence Base's own app flagged, which is what keeps a WARNING
+# saying "contact Base Support" rare enough to mean something. On a Wi-Fi
+# battery it should effectively never fire - and if it does, the link is the
+# first thing to check, not the battery. The one real occurrence so far was an
+# access point with its PoE injector unplugged on the ethernet side; the
+# battery fell back to cellular and stayed there until the AP came back.
 TELEMETRY_GRACE = timedelta(minutes=30)
 MIN_TELEMETRY_POLLS = 2
 

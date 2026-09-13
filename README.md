@@ -23,12 +23,27 @@ completed against the live service, the entry loaded on Home Assistant
 2026.9.2, and nine entities were created. The contract behind it is confirmed
 live too: auth, `ListLocations`, `GetLocation` and `GetSnapshot` all answered.
 
-What is **not** yet observed is live battery VALUES: the site has been
-answering `telemetry_unavailable` since shortly after setup - the battery is
-not reporting to Base, which Base's own app confirms - so `on_grid`, a
-negative `power from storage` and the binary sensors reading `off` have never
-been seen on real data. Statements in `docs/API.md` still marked unconfirmed
-remain readings of the app binary.
+**The numbers are confirmed real, three ways.** Once the battery resumed
+reporting, the readings were checked rather than assumed: the power flow
+balances to **0.000 kW** (`from_grid` + `from_storage` = `to_home`, three
+separately parsed fields), the stored-energy derivation agrees with the
+independent backup-at-current-usage figure to **0.4%**, and `to_home` lands
+within **1.9%** of a different vendor's whole-panel CTs on the same house.
+That last one is the strongest available evidence these are measurements
+rather than plausible-looking garbage, because nothing in this code path
+touches the other vendor's figure.
+
+What is still **unobserved**, and why:
+
+| Not yet seen | Why |
+|---|---|
+| Every off-grid state, and **State of charge** with a value | Needs a real grid outage. `on_grid` is confirmed. |
+| A negative **Power from storage** on an entity | Seen on the wire at −0.3 kW and pinned as a test fixture, but the field has read positive since the entry existed. |
+| **Power from solar** | The test site has no solar, so Base omits the field entirely. |
+| `UsageService` samples | Both methods answer, and return empty for this site. Cause unknown. |
+
+Statements in `docs/API.md` still marked unconfirmed remain readings of the
+app binary.
 
 ## Setting it up
 
@@ -113,25 +128,41 @@ Holding the last value through either would show a stale number as current.
 The **Battery state** sensor is the deliberate exception: it stays available to
 say *why* the others went away.
 
-### Expect gaps, especially on a cellular battery
+### Expect gaps — and check the Wi-Fi first
 
 **The battery has its own reporting cadence, separate from this poll
-interval**, and Home Assistant cannot speed it up. The unit reports to Base
-over Wi-Fi or over a cellular link, and on cellular it reports infrequently —
-Base then drops the snapshot once it goes stale rather than serving an old
-one. Measured on a perfectly healthy battery: a snapshot already five minutes
-old, and no current telemetry about ten minutes after its last report.
+interval**, and Home Assistant cannot speed it up. It reports to Base over
+Wi-Fi when it can and falls back to cellular when it cannot. The two are not
+close, both measured on the same healthy battery on the same day:
 
-So **entities dropping to unavailable for a few minutes at a time is normal**
-on a cellular-connected site — not a fault, and not something to fix. Polling
-faster does not help; it only asks more often for data the battery has not
-sent. If the gaps bother you, an automation or a template sensor can hold the
-last value. This integration deliberately will not, because a stale kW figure
-is indistinguishable from a real one.
+| Link | Time between observations |
+|---|---|
+| Wi-Fi | **32 seconds** |
+| Cellular | **minutes** — a snapshot already 4m51s old when sampled, and no current telemetry about ten minutes after the last report |
 
-A repair notice appears only after **30 minutes** without telemetry — well
-clear of a normal reporting gap, and short enough to catch a battery that has
-genuinely stopped.
+Base drops a snapshot once it goes stale rather than serving an old one, so on
+cellular `telemetry_unavailable` comes and goes in ordinary service and
+entities drop to unavailable for a few minutes at a time. On Wi-Fi that
+essentially does not happen.
+
+**So repeated gaps are a signal rather than noise: they usually mean the
+battery has fallen back to cellular.** That is what the **Battery Wi-Fi
+network** diagnostic sensor is for — enable it, and if it reads anything but
+connected, the thing to check is the access point the battery associates with,
+not the battery. Diagnosed exactly that way once: an AP whose PoE injector had
+been unplugged on the *ethernet* side, so the AP looked powered while the
+battery had no path. It fell back to cellular and Base's own app showed "No
+battery data" for most of a day. Restoring the AP brought reporting back
+within the hour.
+
+Polling faster does not help either way; it only asks more often for data the
+battery has not sent. If the gaps bother you, an automation or a template
+sensor can hold the last value. This integration deliberately will not,
+because a stale kW figure is indistinguishable from a real one.
+
+A repair notice appears only after **30 minutes** without telemetry — clear of
+even the cellular cadence, so on Wi-Fi it should essentially never fire, and
+short enough to catch a battery that has genuinely stopped.
 
 ## Configuration
 
@@ -189,8 +220,8 @@ Entity ids follow your site's device name, so adjust them to match.
 |---|---|
 | **State of charge is `unknown`** | Expected while on grid. Base only publishes it off grid. Use **Stored energy** instead. |
 | **No solar sensor** | The site does not declare solar. Base omits the field, so the sensor is not created rather than reading a false zero. |
-| **Entities go unavailable for a few minutes, repeatedly** | Normal on a cellular-connected battery — see *Expect gaps* above. It reports infrequently and Base drops the snapshot once it is stale. Nothing to fix, and polling faster will not help. |
-| **Everything is unavailable, but the integration looks fine** | Either the poll is failing, or Base answered `telemetry_unavailable`. Check **Battery state** — it stays available and says which. If it reads `telemetry_unavailable`, the integration is working and Base has no current reading from the battery; Base's own app shows the same banner. A repair notice appears after **30 minutes**, long enough to rule out an ordinary reporting gap. Your backup is unaffected: the battery still powers the house in an outage while it is not reporting. Contact Base Support if it does not clear. The battery does **not** report over Wi-Fi, so the Wi-Fi sensor is not the thing to chase (see `docs/API.md`). |
+| **Entities go unavailable for a few minutes, repeatedly** | The battery is very likely on cellular rather than Wi-Fi — see *Expect gaps* above. Cellular reports infrequently and Base drops the snapshot once it is stale. Polling faster will not help. Enable the **Battery Wi-Fi network** diagnostic: if it is not connected, check the access point it associates with. |
+| **Everything is unavailable, but the integration looks fine** | Either the poll is failing, or Base answered `telemetry_unavailable`. Check **Battery state** — it stays available and says which. If it reads `telemetry_unavailable`, the integration is working and Base has no current reading from the battery; Base's own app shows the same banner. A repair notice appears after **30 minutes**, long enough to rule out an ordinary reporting gap. Your backup is unaffected: the battery still powers the house in an outage while it is not reporting. **Check the Wi-Fi before contacting Base**: enable the **Battery Wi-Fi network** diagnostic, and if it is not connected the battery is on cellular fallback, which is the usual cause. Contact Base Support only if the link is fine and it still does not clear. |
 | **Asked to sign in again** | A Base session ended or was revoked. Reauthentication re-sends a code to the stored address. |
 | **"Base Power is temporarily refusing sign-in attempts"** | Clerk rate-limiting. Wait a few minutes; retrying immediately makes it worse. |
 | **Sign-in fails and mentions Google, Apple or two-factor** | The emailed-code route cannot complete those. Use the paste option in the setup menu. |

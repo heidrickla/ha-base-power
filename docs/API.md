@@ -15,17 +15,24 @@ field null, and `wifi.status = BATTERY_WIFI_CONNECTION_STATUS_UNAVAILABLE`.
 The poll itself is healthy — `last_update_success` true, no exception — so
 whatever this is, it is not a client fault.
 
-**What it is remains open, and the phrasing here is deliberately careful.**
-What was *observed* is that the snapshot was stale beyond whatever threshold
-the API applies. Whether the battery had genuinely stopped, or had merely not
-reported recently enough, is **not settled** — the same site was later seen
-flipping `telemetry_available` to false within about ten minutes of a good
-reading, in normal service, because it reports over cellular. Base's own "No
-battery data" banner may be surfacing that same staleness rather than a
-defect. So this document says *stale*, not *broken*, and an earlier draft that
-called it a blackout was claiming more than the evidence carries.
+**SOLVED the same day, and it was never the battery.** The access point the
+unit associates with had its PoE injector unplugged on the *ethernet* side —
+so the AP looked powered, carried no traffic, and the battery fell back to its
+cellular link. Cellular reports on a minutes-scale cadence, the API drops a
+snapshot once it goes stale rather than serving it, and `telemetry_available`
+oscillated for the rest of the day. Restoring the AP restored 32-second
+reporting. See the `wifi_status` section below for what that sequence cost.
 
-Two things that matters for:
+The careful phrasing this section carried while it was open was still the
+right call, and it is worth keeping the reason: what was *observed* was only
+that the snapshot was stale beyond whatever threshold the API applies.
+*Stale* and *broken* were not distinguishable from one poll, Base's own "No
+battery data" banner turned out to be surfacing exactly that staleness, and an
+earlier draft that called it a blackout was claiming more than the evidence
+carried. The conservative wording survived contact with the answer; the
+confident one would not have.
+
+Two things it matters for:
 
 - It is the **first live confirmation of the telemetry-unavailable variant**,
   which until then was only a name in the descriptor.
@@ -52,28 +59,57 @@ cellular connection they use to connect to the battery when wifi isn't
 working."* That is the mechanism behind every observation here, and it is not
 visible to end users anywhere in the app or the API.
 
-**So `wifi_status` is not a telemetry diagnostic, and must not be presented as
-one.**
-An earlier draft of this document said to check it; that was wrong, and the
-evidence is in the captures. `BatteryWifiConnectionStatus` distinguishes
-`UNSPECIFIED`, `UNAVAILABLE`, `NOT_CONNECTED`, `CONNECTING` and `CONNECTED`,
-and the strings are separable by length (the prefix is 31 characters, so
-`NOT_CONNECTED` is 44 and `UNAVAILABLE` is 42):
+### `wifi_status`: what it does and does not tell you — corrected twice
 
-| when | telemetry | `wifi.status` |
-|---|---|---|
-| 02:41, `onGrid` with real power flows | flowing | 44 = `NOT_CONNECTED` |
-| later the same day, `telemetryUnavailable` | absent | 42 = `UNAVAILABLE` (read directly from diagnostics) |
+This section has now been wrong in both directions, and the sequence is worth
+keeping, because the second error was made while correcting the first.
 
-The battery reported perfectly well while its Wi-Fi was **not connected**, on
-two separate occasions either side of the outage, so Wi-Fi is not the
-telemetry transport — the cellular link is. The field moving to `UNAVAILABLE`
-during the gap accompanies the staleness rather than causing it. The
-actionable advice is Base Support, which is exactly what Base's own banner
-says and why its wording is better than the obvious guess.
+`BatteryWifiConnectionStatus` distinguishes `UNSPECIFIED`, `UNAVAILABLE`,
+`NOT_CONNECTED`, `CONNECTING` and `CONNECTED`. The strings are separable by
+length (the prefix is 31 characters, so `NOT_CONNECTED` is 44, `UNAVAILABLE`
+42, `CONNECTED` 40). **Three of the five were observed on one day:**
 
-The enum took two real values in one day, and **neither tells you whether data
-is flowing**, so nothing user-facing should present it as if it did.
+| when | telemetry | `wifi.status` | observed cadence |
+|---|---|---|---|
+| 02:41, `onGrid` with real power flows | flowing | 44 = `NOT_CONNECTED` | — |
+| midday, `telemetryUnavailable` | absent | 42 = `UNAVAILABLE` | — |
+| 19:18 | available, snapshot already 4m51s stale | `NOT_CONNECTED` | cellular: **minutes** |
+| evening, after the AP was restored | flowing | 40 = `CONNECTED`, `wifi_ssid_present` true | Wi-Fi: **32 seconds** |
+
+**Draft one said: check the Wi-Fi.** Then telemetry was seen flowing with
+`wifi.status = NOT_CONNECTED`, twice, either side of the gap.
+
+**Draft two therefore said `wifi_status` is not a telemetry diagnostic at all
+and must not be presented as one. That was the bigger mistake.** The
+observation behind it was real; the inference drawn from it was too wide. "The
+battery can report without Wi-Fi" is not the same claim as "Wi-Fi is
+irrelevant to whether it reports", and the first does not establish the
+second.
+
+**What actually happened**: the access point the battery associates with had
+its PoE injector unplugged on the *ethernet* side, so the AP looked powered
+while carrying no traffic. The battery fell back to cellular, cellular reports
+on a minutes-scale cadence, Base drops a stale snapshot rather than serving
+it, and `telemetry_available` oscillated all day — with Base's own app showing
+"No battery data" throughout. Restoring the AP restored 32-second reporting.
+
+So the correct reading, which neither earlier draft had:
+
+- **Wi-Fi is the normal transport; cellular is the fallback.** 32 s versus
+  minutes is not a detail, it is the difference between an integration that
+  updates and one that gaps.
+- **`wifi_status` does not tell you whether data is flowing right now** — that
+  is what draft two got right, and `telemetry_available` remains the field for
+  that.
+- **It does tell you which cadence to expect, which is the actionable part.**
+  A battery that keeps going unavailable is very likely on cellular, and the
+  thing to check is the AP, not the battery and not Base Support.
+
+The honest generalisation: a single observation refuted the narrow claim
+("Wi-Fi must be up for telemetry to flow") and was then used to assert a broad
+one ("Wi-Fi does not matter") that it never supported. Retracting correct
+advice costs as much as giving wrong advice, and this cost a day of looking at
+the wrong component.
 
 ## The numbers are real: three cross-checks, 2026-09-13
 
@@ -89,13 +125,21 @@ That third one is the strongest evidence available that these are real
 measurements rather than plausible-looking garbage, because nothing in this
 integration's code path touches the Emporia figure.
 
-**A caveat on any cadence numbers quoted later.** From 2026-09-13 evening the
-owner was adding Wi-Fi to the battery, and Base's own UI warns the unit may
-disconnect during that process. Any telemetry gap measured in that window is a
-radio being reconfigured, not evidence about normal cellular cadence. The two
-samples above (19:18 available with a 4m51s-stale snapshot, 19:23
-unavailable) predate the work and stand; nothing measured during it should be
-cited as service behaviour.
+**A caveat on every cadence number in this document, including the new ones.**
+From 2026-09-13 evening the owner was working on the battery's Wi-Fi, and
+Base's own UI warns the unit may disconnect during that process. Any gap
+measured inside that window is a radio being reconfigured, not service
+behaviour. What stands either side of it:
+
+- **Cellular, 19:18 and 19:23** — available with a 4m51s-stale snapshot, then
+  unavailable. Predates the work.
+- **Wi-Fi, 32 s between successive observations** — measured after the access
+  point was restored, so it is steady state rather than mid-reconfiguration.
+
+Both are **single-session observations on one battery**, which is enough to
+establish the order-of-magnitude contrast that the repair threshold is
+calibrated against and is not enough to quote as a specification. Neither has
+been replicated on a second site, and no other site has been seen at all.
 
 **A negative `from_storage` HAS been observed — on the API, not yet through an
 entity.** The 02:41 capture below carries `fromStorageKw: -0.3`, the battery
