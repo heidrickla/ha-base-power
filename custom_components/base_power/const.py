@@ -1,0 +1,28 @@
+"""Constants for the Base Power integration."""
+
+from __future__ import annotations
+
+from datetime import timedelta
+
+DOMAIN = "base_power"
+
+CONF_CLIENT_JWT = "client_jwt"
+CONF_ADDRESS_ID = "address_id"
+
+# The app polls GetSnapshot every 1000 ms, but React Query only refetches
+# while the screen is mounted and focused - a burst while someone is looking
+# at it, not a standing load. A Home Assistant integration polls 24/7, so
+# copying 1 s here would turn a few hundred calls a day into 86,400 against
+# somebody else's production service for data that moves far slower than that.
+# 30 s keeps the outage sensor responsive enough to be useful and is the
+# default rather than a limit; the user can raise it.
+DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
+MIN_SCAN_INTERVAL_SECONDS = 5
+
+# 750 W is the reference load the API reports backup hours against, so
+# hours x 0.75 kW is the stored energy it implies. This is the only route to
+# stored energy while on grid, because the on-grid snapshot carries no state
+# of charge at all (confirmed live, see docs/API.md).
+BACKUP_REFERENCE_KW = 0.75
+
+MANUFACTURER = "Base Power"

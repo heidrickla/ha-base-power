@@ -1,0 +1,68 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Base Power",
+        "description": "Base Power signs in with an emailed code or a social login, so there is no password to enter here. Sign in at https://account.basepowercompany.com/sign-in, then copy the value of the `__client` cookie for that site (DevTools → Application → Cookies) and paste it below. It is long-lived; Home Assistant uses it to mint short-lived tokens the same way the mobile app does.",
+        "data": {
+          "client_jwt": "Clerk client credential (__client cookie)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Base Power needs signing in again",
+        "description": "The stored credential is no longer accepted, which happens when the Clerk session ends or is revoked. Sign in again at https://account.basepowercompany.com/sign-in and paste a fresh `__client` cookie value.",
+        "data": {
+          "client_jwt": "Clerk client credential (__client cookie)"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Base Power rejected that credential. Check it was copied whole, and that it is the `__client` cookie rather than `__session` (which expires after about a minute).",
+      "cannot_connect": "Could not reach the Base Power API.",
+      "no_locations": "That credential works, but the account has no sites on it.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "That site is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Base Power options",
+        "description": "How often to poll. The mobile app refreshes every second, but only while its screen is open; Home Assistant polls continuously, so the default is 30 seconds.",
+        "data": {
+          "scan_interval": "Poll interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "power_to_home": { "name": "Power to home" },
+      "power_from_grid": { "name": "Power from grid" },
+      "power_from_storage": { "name": "Power from storage" },
+      "power_from_solar": { "name": "Power from solar" },
+      "backup_hours": { "name": "Estimated backup time" },
+      "stored_energy": { "name": "Stored energy" },
+      "state_of_charge": { "name": "State of charge" },
+      "wifi_ssid": { "name": "Battery Wi-Fi network" },
+      "battery_state": {
+        "name": "Battery state",
+        "state": {
+          "on_grid": "On grid",
+          "off_grid_outage": "Grid outage",
+          "off_grid_no_home_power": "Off grid, no home power",
+          "off_grid_overcurrent": "Off grid, overcurrent",
+          "off_grid_overcurrent_standby": "Off grid, overcurrent standby",
+          "telemetry_unavailable": "Telemetry unavailable",
+          "unknown": "Unknown"
+        }
+      }
+    },
+    "binary_sensor": {
+      "grid_outage": { "name": "Grid outage" },
+      "off_grid": { "name": "Running off grid" }
+    }
+  }
+}

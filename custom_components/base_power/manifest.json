@@ -1,0 +1,12 @@
+{
+  "domain": "base_power",
+  "name": "Base Power",
+  "codeowners": ["@heidrickla"],
+  "config_flow": true,
+  "documentation": "https://github.com/heidrickla/ha-base-power",
+  "integration_type": "device",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/heidrickla/ha-base-power/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
