@@ -117,6 +117,26 @@ async def test_email_then_code_creates_the_entry(hass: HomeAssistant) -> None:
     assert result["result"].unique_id == ADDRESS_ID
 
 
+async def test_a_site_with_no_name_falls_back_to_the_literal_title(
+    hass: HomeAssistant,
+) -> None:
+    """Base returns no name for some sites, and the title becomes the device
+    name, which becomes the entity id prefix. This is the case on the only
+    production instance, so it decides what the README examples must say.
+    """
+    result = await _start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "manual"}
+    )
+    unnamed = [Location(address_id=ADDRESS_ID, name=None)]
+    with patch(CLIENT, return_value=_client(locations=unnamed)):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_CLIENT_JWT: CREDENTIAL}
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Base Power"
+
+
 async def test_the_email_is_stripped_before_use(hass: HomeAssistant) -> None:
     """Copy-paste from a mail client brings whitespace, and Clerk would treat
     ' a@b.test' as a different, unknown address."""

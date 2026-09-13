@@ -11,7 +11,8 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
-from fixtures_const import ADDRESS_ID
+import pytest
+from fixtures_const import ADDRESS_ID, CREDENTIAL
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_SCAN_INTERVAL, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
@@ -32,6 +33,8 @@ from custom_components.base_power.api import (
 )
 from custom_components.base_power.clerk import ClerkAuthError
 from custom_components.base_power.const import (
+    CONF_ADDRESS_ID,
+    CONF_CLIENT_JWT,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     ISSUE_TELEMETRY_UNAVAILABLE,
@@ -146,31 +149,77 @@ async def test_an_interval_below_the_floor_is_raised_to_it(
     assert mock_entry.runtime_data.update_interval == timedelta(seconds=15)
 
 
-async def test_the_entity_ids_are_the_ones_the_readme_documents(
+ENTITY_SUFFIXES = {
+    "binary_sensor": ("grid_outage", "running_off_grid"),
+    "sensor": (
+        "battery_state",
+        "battery_wi_fi_network",
+        "estimated_backup_time",
+        "power_from_grid",
+        "power_from_storage",
+        "power_to_home",
+        "state_of_charge",
+        "stored_energy",
+    ),
+}
+
+
+def _expected_ids(prefix: str) -> set[str]:
+    return {
+        f"{domain}.{prefix}_{suffix}"
+        for domain, suffixes in ENTITY_SUFFIXES.items()
+        for suffix in suffixes
+    }
+
+
+@pytest.mark.parametrize(
+    "title,prefix",
+    [
+        ("Home", "home"),
+        # The config flow titles the entry `location.name or "Base Power"`, so
+        # a site Base returns no name for lands on the literal fallback. That
+        # is the case on the only production instance, and it is why the
+        # entity ids there read base_power_*, not the domain appearing in them.
+        ("Base Power", "base_power"),
+    ],
+)
+async def test_the_entity_id_prefix_is_the_entry_title(
+    hass: HomeAssistant, title: str, prefix: str
+) -> None:
+    """Home Assistant builds the id from the device name, which is the entry
+    title, so the prefix varies per account. The README examples are
+    copy-paste, and a wrong id there fires nothing and logs nothing.
+
+    Both cases are here because one fixture cannot show the variable: an
+    earlier version of this test asserted a single hardcoded set generated
+    from the same fixture it compared against, so it could not fail.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=title,
+        unique_id=ADDRESS_ID,
+        data={CONF_CLIENT_JWT: CREDENTIAL, CONF_ADDRESS_ID: ADDRESS_ID},
+    )
+    await _setup(hass, entry)
+    registry = er.async_get(hass)
+    created = {e.entity_id for e in er.async_entries_for_config_entry(registry, entry.entry_id)}
+    assert created == _expected_ids(prefix)
+
+
+async def test_the_readme_lists_exactly_the_ids_that_get_created(
     hass: HomeAssistant, mock_entry: MockConfigEntry
 ) -> None:
-    """The README's automation examples are copy-paste, so a wrong id there
-    silently does nothing for the user. An earlier draft used a `base_power_`
-    prefix; the domain is not part of the id, the site name is.
+    """Reads the README rather than a copy of it, because the failure this
+    guards against was a table generated from an unrepresentative fixture and
+    never compared to a real registry.
     """
+    import re
+    from pathlib import Path
+
     await _setup(hass, mock_entry)
-    documented = {
-        "binary_sensor.home_grid_outage",
-        "binary_sensor.home_running_off_grid",
-        "sensor.home_battery_state",
-        "sensor.home_battery_wi_fi_network",
-        "sensor.home_estimated_backup_time",
-        "sensor.home_power_from_grid",
-        "sensor.home_power_from_storage",
-        "sensor.home_power_to_home",
-        "sensor.home_state_of_charge",
-        "sensor.home_stored_energy",
-    }
-    registry = er.async_get(hass)
-    created = {
-        e.entity_id for e in er.async_entries_for_config_entry(registry, mock_entry.entry_id)
-    }
-    assert created == documented, "the README's entity id list no longer matches"
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
+    listed = set(re.findall(r"\b(?:binary_)?sensor\.[a-z0-9_]+", readme))
+    assert listed == _expected_ids("base_power") | _expected_ids("home")
 
 
 # ------------------------------------------------------- what is NOT created

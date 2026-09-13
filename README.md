@@ -168,19 +168,28 @@ maximum 3600. Changing it reloads the entry.
 - Alert on a battery fault. Battery state distinguishes an overcurrent trip
   from an ordinary outage.
 
-Entity ids are `<site name>_<entity name>`, taking the site name Base returns
-for your address. The domain is not part of the id. A site called Home gives:
+Check your entity ids before copying the examples below. The prefix is your
+device name, not the domain, and it differs between accounts.
 
-```
-binary_sensor.home_grid_outage        sensor.home_power_to_home
-binary_sensor.home_running_off_grid   sensor.home_power_from_grid
-sensor.home_battery_state             sensor.home_power_from_storage
-sensor.home_estimated_backup_time     sensor.home_state_of_charge
-sensor.home_stored_energy             sensor.home_battery_wi_fi_network
-```
+Base returns a name for some sites and not others. When it returns none, the
+integration falls back to the literal "Base Power", giving `base_power_`.
+When it returns one, say Home, you get `home_` instead. Open Settings >
+Devices & services, click the device, and read the prefix off any entity.
 
-The examples below use those. Substitute your own site name, which is the
-device name shown in Settings > Devices & services.
+The examples use the `base_power_` fallback. For a named site, substitute:
+
+| Entity | Unnamed site | Site named Home |
+|---|---|---|
+| Grid outage | `binary_sensor.base_power_grid_outage` | `binary_sensor.home_grid_outage` |
+| Running off grid | `binary_sensor.base_power_running_off_grid` | `binary_sensor.home_running_off_grid` |
+| Battery state | `sensor.base_power_battery_state` | `sensor.home_battery_state` |
+| Estimated backup time | `sensor.base_power_estimated_backup_time` | `sensor.home_estimated_backup_time` |
+| Power to home | `sensor.base_power_power_to_home` | `sensor.home_power_to_home` |
+| Power from grid | `sensor.base_power_power_from_grid` | `sensor.home_power_from_grid` |
+| Power from storage | `sensor.base_power_power_from_storage` | `sensor.home_power_from_storage` |
+| State of charge | `sensor.base_power_state_of_charge` | `sensor.home_state_of_charge` |
+| Stored energy | `sensor.base_power_stored_energy` | `sensor.home_stored_energy` |
+| Battery Wi-Fi network | `sensor.base_power_battery_wi_fi_network` | `sensor.home_battery_wi_fi_network` |
 
 ### Notify on a grid outage
 
@@ -189,14 +198,14 @@ automation:
   - alias: "Power is out"
     trigger:
       - trigger: state
-        entity_id: binary_sensor.home_grid_outage
+        entity_id: binary_sensor.base_power_grid_outage
         to: "on"
     action:
       - action: notify.mobile_app
         data:
           message: >-
             Grid is down. Battery has about
-            {{ states('sensor.home_estimated_backup_time') }} hours left.
+            {{ states('sensor.base_power_estimated_backup_time') }} hours left.
 ```
 
 ### Template sensor for charge direction
@@ -206,7 +215,7 @@ template:
   - sensor:
       - name: "Battery direction"
         state: >-
-          {% set kw = states('sensor.home_power_from_storage') | float(0) %}
+          {% set kw = states('sensor.base_power_power_from_storage') | float(0) %}
           {{ 'charging' if kw < 0 else 'discharging' if kw > 0 else 'idle' }}
 ```
 
