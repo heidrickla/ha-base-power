@@ -70,7 +70,10 @@ rules:
       emailed code, enter the address, enter the code. The fallback paste
       path is described as a fallback and says when it is needed.
   docs-removal-instructions:
-    status: todo
+    status: done
+    comment: |
+      README says how to delete the entry, what that does and does not
+      affect, and how to revoke the session at Base as well.
   docs-triggers:
     status: exempt
     comment: No triggers.
@@ -113,8 +116,10 @@ rules:
   config-entry-unloading:
     status: done
   docs-configuration-parameters:
-    status: todo
-    comment: The options flow has one parameter; it is not documented yet.
+    status: done
+    comment: |
+      README documents the one option - poll interval, its default, floor and
+      ceiling, and that changing it reloads the entry.
   docs-installation-parameters:
     status: todo
   entity-unavailable:
@@ -148,14 +153,19 @@ rules:
   test-coverage:
     status: todo
     comment: |
-      50 tests cover the pure layer - the snapshot state union, the power
+      53 tests cover the pure layer - the snapshot state union, the power
       flow's None-vs-zero distinction, capability parsing, error mapping,
       diagnostics redaction and the Clerk sign-in state machine - including
-      fixtures captured from the live API. The HA layer itself has NO tests.
-      It is now known to IMPORT under Home Assistant 2026.9.2 (verified by
-      ha-management-02 on the live instance, config flow rendered over the
-      REST API), but the entity platforms have still never been imported,
-      because that needs an entry to actually set up.
+      fixtures captured from the live API. The HA layer itself has NO tests,
+      which is what keeps this todo.
+
+      It is however now PROVEN TO LOAD: a real entry on Home Assistant
+      2026.9.2 reached state=loaded with all four platform modules imported
+      and nine entities constructed, so SensorDeviceClass.ENERGY_STORAGE
+      resolves and the ENUM options validate. What is still unobserved is
+      live VALUES - the site was answering telemetry_unavailable at the time,
+      so on_grid, a negative from_storage and the binary sensors reading off
+      have never been seen on real data.
 
   # Gold
   devices:
@@ -176,9 +186,16 @@ rules:
       The API is reached over the internet and scoped by an account
       credential; there is nothing discoverable.
   docs-data-update:
-    status: todo
+    status: done
+    comment: |
+      README has a How data updates section: cloud polling, the interval and
+      why it is not the app's 1 s, and the two conditions that make entities
+      unavailable.
   docs-examples:
-    status: todo
+    status: done
+    comment: |
+      Two worked examples in the README - an outage notification and a
+      template sensor for charge/discharge direction.
   docs-known-limitations:
     status: done
     comment: |
@@ -186,14 +203,22 @@ rules:
       UsageService returning no samples for the site tested, and the HA layer
       being unverified by execution.
   docs-supported-devices:
-    status: todo
+    status: done
+    comment: |
+      README says one device per site, discovered rather than entered, and
+      that it is cloud-only with no local path to the battery.
   docs-supported-functions:
     status: done
     comment: README lists the entities and says which are deliberately absent.
   docs-troubleshooting:
-    status: todo
+    status: done
+    comment: |
+      README has a troubleshooting table covering the two readings that look
+      like faults and are not (state of charge unknown on grid, no solar
+      sensor), the unavailability cases, and each sign-in failure.
   docs-use-cases:
-    status: todo
+    status: done
+    comment: README lists four, led by the outage sensor.
   dynamic-devices:
     status: exempt
     comment: |

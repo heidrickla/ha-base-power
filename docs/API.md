@@ -7,6 +7,29 @@ service** (2026-09-13, read-only, `tools/live_probe.py`). Anything not marked
 confirmed is still a reading of the binary rather than a measurement, and says
 so.
 
+## `telemetry_unavailable` observed, 2026-09-13
+
+The first real setup found the site answering with **no telemetry at all**:
+`GetSnapshot` returns the `telemetry_unavailable` variant, every `power_flow`
+field null, and `wifi.status = BATTERY_WIFI_CONNECTION_STATUS_UNAVAILABLE`.
+The poll itself is healthy — `last_update_success` true, no exception — so
+this is the service reporting that the battery is not talking to it, not a
+client fault.
+
+Two things that matters for:
+
+- It is the **first live confirmation of the telemetry-unavailable variant**,
+  which until then was only a name in the descriptor.
+- The availability design got its first real test and behaved: every value
+  entity went `unavailable` rather than showing a confident zero, and
+  `battery_state` stayed available reading `telemetry_unavailable` to say
+  why. A reading of `0 kW` there would have been indistinguishable from a
+  house drawing nothing.
+
+The wifi status is the likely explanation and the first thing to check: a
+battery that has lost its network connection cannot report, and Base's own
+app would show the same gap.
+
 ## Confirmed live, 2026-09-13
 
 - Clerk minting works: browser `__client` → `GET /v1/client` → active session
