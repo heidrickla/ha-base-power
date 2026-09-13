@@ -44,6 +44,34 @@ The app authenticates with **Clerk**, not with a Base-issued credential:
 - account portal: `https://account.basepowercompany.com/`
 - the app reads the token via Clerk's `useAuth()` and attaches it per request
 
+**Sign-in is passwordless.** The only strategies in the bundle are
+`email_code`, `email_link`, `phone_code`, `google` and `oauth_apple` — there
+is **no `password` strategy**, so an integration cannot take an email and
+password. The user completes a code or social flow once.
+
+- Hosted portal: `https://account.basepowercompany.com/` → redirects to
+  `/sign-in` (verified 2026-09-13, HTTP 200)
+- Clerk frontend API: `https://clerk.basepowercompany.com` (HTTP 200)
+- The app drives it over the Clerk endpoints it ships:
+  `/client/sign_ins`, `/verify/prepare_first_factor`,
+  `/verify/attempt_first_factor`, `/client/sessions`, `/client/sessions/.../tokens`
+
+**Two tokens, and the difference decides the design:**
+
+| cookie | lifetime | use |
+|---|---|---|
+| `__session` | ~60 s | the bearer JWT for API calls; fine for one manual test, useless to store |
+| `__client` | long-lived | the durable credential; mints fresh session JWTs via `POST https://clerk.basepowercompany.com/v1/client/sessions/<session_id>/tokens` |
+
+So the integration stores the **client** credential and mints a session token
+per poll, which is what `BasePowerClient`'s `token_provider` callable exists
+for.
+
+`https://dashboard.baseapis.net/` answers **HTTP 415** to a bare GET — a
+Connect endpoint refusing a request with no usable content type. That is the
+only live confirmation obtained so far, and it confirms the host and protocol
+only, nothing about the methods.
+
 **No custom JWT template is used.** Clerk's `getToken()` accepts
 `{ template, leewayInSeconds, skipCache }`, and the only occurrences of
 `template` in the bundle are that generic options object and Expo's icon
