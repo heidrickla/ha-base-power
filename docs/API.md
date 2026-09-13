@@ -249,6 +249,28 @@ above. What is left:
    constraint as the `ha-tuxedo-touch` repo, which runs that layer in CI on
    Linux.
 
+## Where the source artefacts are kept
+
+Deliberately **outside this repo**, at `<artifacts-dir>\artifacts\` on the
+workstation, so re-analysis never needs the phone plugged in again:
+
+| file | |
+|---|---|
+| `base-power-1.14.0-base.apk` | md5 `e92bcb53`, 120 MB - the pulled app |
+| `hbc-parse.txt` | hermes-dec's parse of the bundle |
+| `strings.literal.txt` | the delimited string literals (what `decode_descriptors.py` reads) |
+| `strings.identifier.txt` | the identifier table |
+
+They are not committed: the repo holds the *derived* contract (`proto/`,
+`docs/`), not Base's app. `.gitignore` refuses `*.apk`, `bundle.hasm` and
+`strings.*.txt` so they cannot be added by accident. The 96 MB disassembly is
+not kept - `hbc-disassembler` regenerates it from the APK in a couple of
+minutes.
+
+The tooling that produced them: `jadx` 1.5.6, and a venv at
+`<artifacts-dir>\venv` with `hermes-dec`, `androguard` and `protobuf` (a short
+path, because Windows MAX_PATH rejects a deep scratchpad install).
+
 ## How to reproduce this
 
 ```bash
