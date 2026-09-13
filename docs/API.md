@@ -110,9 +110,7 @@ per poll, which is what `BasePowerClient`'s `token_provider` callable exists
 for.
 
 `https://dashboard.baseapis.net/` answers **HTTP 415** to a bare GET — a
-Connect endpoint refusing a request with no usable content type. That is the
-only live confirmation obtained so far, and it confirms the host and protocol
-only, nothing about the methods.
+Connect endpoint refusing a request with no usable content type.
 
 **No custom JWT template is used.** Clerk's `getToken()` accepts
 `{ template, leewayInSeconds, skipCache }`, and the only occurrences of
@@ -121,11 +119,14 @@ only, nothing about the methods.
 accepts a **plain Clerk session token** (`__session`), which is the simplest
 case for a headless client.
 
-**Not yet established:** which Clerk sign-in flow a headless integration
-should use to obtain that session, and how to refresh it before expiry (Clerk
-session JWTs are short-lived, typically ~60 s, and are refreshed against the
-frontend API). That is the first open question and it needs a real sign-in to
-answer.
+**Established 2026-09-13, and implemented in `clerk.py`:** the user signs in
+once at the hosted portal and hands the integration the durable `__client`
+cookie; the integration then mints session JWTs itself, caching each until it
+is close to expiry. Refresh needs no further interaction.
+
+What remains open is only how long a `__client` lasts before Clerk ends the
+session and the user has to sign in again — unknown, so the integration
+raises a reauth flow when it happens rather than assuming it will not.
 
 ## Services and methods
 
@@ -211,17 +212,29 @@ Directly mappable, from `GetSnapshot` polled on an interval:
 
 ## Open questions, in the order they block work
 
-1. **Clerk token acquisition and refresh** for a headless client. Everything
-   else is ready; nothing can be called without this.
-2. **Poll interval.** The app sets `refetchInterval` on the snapshot query;
-   the value was not read out. Pick conservatively until measured — this is
-   somebody's production service.
-3. **Whether `on_grid` really omits state of charge.** The descriptor says so;
-   that would be odd and is worth confirming against a live response before
-   designing the SoC sensor around it.
-4. **Nothing here has been run against the live API.** Every statement above
-   is from the app binary. The first live call is also the first test of all
-   of it.
+The first four (token acquisition, poll interval, whether `on_grid` really
+omits state of charge, and whether any of it worked live) are all answered
+above. What is left:
+
+1. **Why `UsageService` returns no samples.** Both read-only methods answer
+   200 with nothing. Until this is understood, the grid-voltage and
+   recent-power sensors are deliberately not built.
+2. **How long a `__client` credential lasts** before Clerk ends the session.
+   Unknown, so the integration raises a reauth flow rather than assuming.
+3. **`GetDailyEnergy` has never been called.** It takes a service period, so
+   it needs a sensible window chosen first; it is the route to the energy
+   dashboard.
+4. **The two control methods have never been exercised** —
+   `StartManualBackup` and `ResetOvercurrent` act on real hardware, the probe
+   refuses them by allowlist, and no entity exposes them yet. Testing them is
+   the owner's call, not a thing to slip into a verification run.
+5. **The Home Assistant layer is byte-compiled, not import-verified.** Home
+   Assistant needs `fcntl` and will not install on the Windows host this was
+   built on, so `coordinator.py`, `sensor.py`, `binary_sensor.py` and
+   `config_flow.py` have not been loaded by a real Home Assistant. `api.py`
+   and `clerk.py` are pure and covered by the test suite. This is the same
+   constraint as the `ha-tuxedo-touch` repo, which runs that layer in CI on
+   Linux.
 
 ## How to reproduce this
 
