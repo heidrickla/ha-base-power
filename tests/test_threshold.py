@@ -22,13 +22,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "base_power"))
 
-from const import (  # noqa: E402
+from const import (
     DEFAULT_SCAN_INTERVAL,
     MIN_TELEMETRY_POLLS,
     TELEMETRY_GRACE,
     silent_polls_before_issue,
 )
-
 
 # Below this the grace period is worth two or more polls and comes out exact;
 # at or above it the two-poll floor takes over. 30 min / 2 polls = 15 min.
@@ -76,7 +75,7 @@ def test_the_grace_clears_the_observed_cellular_cadence():
     a warning telling the user to contact Base Support.
     """
     observed_cellular_gap = timedelta(minutes=10)
-    assert TELEMETRY_GRACE >= observed_cellular_gap * 2, (
+    assert observed_cellular_gap * 2 <= TELEMETRY_GRACE, (
         "the grace period must clear a normal cellular reporting gap with room "
         "to spare, or the repair issue fires in ordinary service"
     )

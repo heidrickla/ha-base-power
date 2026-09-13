@@ -19,7 +19,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "base_power"))
 
-from clerk_signin import (  # noqa: E402
+from clerk_signin import (
     ClerkBadCode,
     ClerkCodeExpired,
     ClerkRateLimited,

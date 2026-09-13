@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import urllib.error
 import urllib.request
 
@@ -154,7 +153,10 @@ def redact(obj, depth=0):
     if isinstance(obj, dict):
         out = []
         for k, v in obj.items():
-            out.append(f"{pad}{k}: {redact(v, depth + 1).lstrip() if isinstance(v, (dict, list)) else redact(v, depth + 1)}")
+            rendered = redact(v, depth + 1)
+            if isinstance(v, (dict, list)):
+                rendered = rendered.lstrip()
+            out.append(f"{pad}{k}: {rendered}")
         return "\n" + "\n".join(out) if out else "{}"
     if isinstance(obj, list):
         if not obj:
@@ -172,9 +174,15 @@ def redact(obj, depth=0):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("creds")
-    ap.add_argument("--snapshot", action="store_true", help="also call BatteryService/GetSnapshot")
-    ap.add_argument("--usage", action="store_true", help="also call the read-only UsageService methods")
-    ap.add_argument("--location", action="store_true", help="also call LocationsService/GetLocation")
+    ap.add_argument(
+        "--snapshot", action="store_true", help="also call BatteryService/GetSnapshot"
+    )
+    ap.add_argument(
+        "--usage", action="store_true", help="also call the read-only UsageService methods"
+    )
+    ap.add_argument(
+        "--location", action="store_true", help="also call LocationsService/GetLocation"
+    )
     a = ap.parse_args()
 
     creds = load_creds(a.creds)

@@ -70,7 +70,7 @@ def check(ok: bool, message: str) -> None:
 def load_json(path: Path):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception as err:  # noqa: BLE001
+    except Exception as err:
         failures.append(f"{path.relative_to(ROOT)} is not valid JSON: {err}")
         return None
 
@@ -119,7 +119,10 @@ def main() -> int:
         used.update(all_keys - raised_keys)
     missing_strings = used - declared
     unused_strings = declared - used
-    check(not missing_strings, f"translation keys used but not in strings.json: {sorted(missing_strings)}")
+    check(
+        not missing_strings,
+        f"translation keys used but not in strings.json: {sorted(missing_strings)}",
+    )
     check(not unused_strings, f"strings.json entries nothing uses: {sorted(unused_strings)}")
 
     # ------------------------------------------------- reserved ENUM states
@@ -146,7 +149,7 @@ def main() -> int:
         enum_options.update(re.findall(r'"([^"]*)"', options))
     if enum_options:
         translated = set(
-            (strings.get("entity", {}).get("sensor", {}).get("battery_state", {}).get("state") or {})
+            strings.get("entity", {}).get("sensor", {}).get("battery_state", {}).get("state") or {}
         )
         check(
             enum_options == translated,
@@ -165,7 +168,11 @@ def main() -> int:
         listed.update(dict(re.findall(r"^  ([a-z0-9-]+):\s*\n\s+status:\s*(\w+)", text, re.M)))
         missing_rules = ALL_RULES - listed.keys()
         unknown_rules = listed.keys() - ALL_RULES
-        check(not missing_rules, f"quality_scale.yaml omits {len(missing_rules)} rules: {sorted(missing_rules)[:6]}")
+        check(
+            not missing_rules,
+            f"quality_scale.yaml omits {len(missing_rules)} rules: "
+            f"{sorted(missing_rules)[:6]}",
+        )
         check(not unknown_rules, f"quality_scale.yaml has unknown rules: {sorted(unknown_rules)}")
         bad = {k: v for k, v in listed.items() if v not in VALID_STATUS}
         check(not bad, f"quality_scale.yaml has invalid statuses: {bad}")

@@ -107,7 +107,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
                 # exactly when someone should be sent to the manual path.
                 _LOGGER.debug("Base Power sign-in could not start: %s", err)
                 errors["base"] = "signin_failed"
-            except Exception:  # noqa: BLE001 - a config flow must never crash
+            except Exception:
                 _LOGGER.exception("unexpected error starting the Base Power sign-in")
                 errors["base"] = "unknown"
             else:
@@ -140,7 +140,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
             except ClerkSignInError as err:
                 _LOGGER.debug("Base Power sign-in did not complete: %s", err)
                 errors["base"] = "signin_failed"
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _LOGGER.exception("unexpected error completing the Base Power sign-in")
                 errors["base"] = "unknown"
             else:
@@ -189,7 +189,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
             errors["base"] = "invalid_auth"
         except BasePowerError:
             errors["base"] = "cannot_connect"
-        except Exception:  # noqa: BLE001
+        except Exception:
             _LOGGER.exception("unexpected error validating the Base Power credential")
             errors["base"] = "unknown"
         else:
@@ -243,7 +243,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = EMAIL_STEP_ERRORS[type(err)]
             except ClerkSignInError:
                 errors["base"] = "signin_failed"
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _LOGGER.exception("unexpected error starting the Base Power reauth")
                 errors["base"] = "unknown"
             else:

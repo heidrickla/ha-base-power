@@ -59,3 +59,27 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Generated artwork, and the generator that writes it. Neither is shipped
+# code and the generator is maintained alongside the images, not here.
+extend-exclude = ["custom_components/base_power/brand", "brand"]
+
+# The same rule set the sibling integrations lint against. Kept identical on
+# purpose: one forge runner lints all of them, and a rule that is on in one
+# repo and off in the next is a rule nobody trusts. Only line-length and
+# target-version differ, because this code was written to 100 and 3.12.
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "W",    # warnings
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # simplify
+    "RUF",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Every test loads the integration by path so it can run without Home
+# Assistant installed, which necessarily puts imports after code.
+"tests/*" = ["E402"]

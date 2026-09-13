@@ -52,47 +52,48 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     decoded = 0
     services = []
-    for line in open(src, encoding="latin-1"):
-        s = line.strip()
-        if len(s) < 120:
-            continue
-        # The bundle stores these unpadded, so try each padding length.
-        fd = None
-        for pad in ("", "=", "=="):
-            try:
-                raw = base64.b64decode(s + pad)
-                cand = descriptor_pb2.FileDescriptorProto()
-                cand.ParseFromString(raw)
-            except Exception:
+    with open(src, encoding="latin-1") as fh:
+        for line in fh:
+            s = line.strip()
+            if len(s) < 120:
                 continue
-            if cand.name.endswith(".proto"):
-                fd = cand
-                break
-        if fd is None:
-            continue
-        decoded += 1
-        lines = [f'// {fd.name}', f'package {fd.package};', ""]
-        for svc in fd.service:
-            lines.append(f"service {svc.name} {{")
-            for meth in svc.method:
-                lines.append(f"  rpc {meth.name}({short(meth.input_type)}) "
-                             f"returns ({short(meth.output_type)});")
-                services.append((fd.package, svc.name, meth.name,
-                                 short(meth.input_type), short(meth.output_type)))
-            lines.append("}")
-            lines.append("")
-        for m in fd.message_type:
-            lines.extend(render_message(m, ""))
-            lines.append("")
-        for e in fd.enum_type:
-            lines.append(f"enum {e.name} {{")
-            for v in e.value:
-                lines.append(f"  {v.name} = {v.number};")
-            lines.append("}")
-            lines.append("")
-        safe = fd.name.replace("/", "_")
-        with open(os.path.join(outdir, safe), "w", encoding="utf-8") as f:
-            f.write("\n".join(lines))
+            # The bundle stores these unpadded, so try each padding length.
+            fd = None
+            for pad in ("", "=", "=="):
+                try:
+                    raw = base64.b64decode(s + pad)
+                    cand = descriptor_pb2.FileDescriptorProto()
+                    cand.ParseFromString(raw)
+                except Exception:
+                    continue
+                if cand.name.endswith(".proto"):
+                    fd = cand
+                    break
+            if fd is None:
+                continue
+            decoded += 1
+            lines = [f'// {fd.name}', f'package {fd.package};', ""]
+            for svc in fd.service:
+                lines.append(f"service {svc.name} {{")
+                for meth in svc.method:
+                    lines.append(f"  rpc {meth.name}({short(meth.input_type)}) "
+                                 f"returns ({short(meth.output_type)});")
+                    services.append((fd.package, svc.name, meth.name,
+                                     short(meth.input_type), short(meth.output_type)))
+                lines.append("}")
+                lines.append("")
+            for m in fd.message_type:
+                lines.extend(render_message(m, ""))
+                lines.append("")
+            for e in fd.enum_type:
+                lines.append(f"enum {e.name} {{")
+                for v in e.value:
+                    lines.append(f"  {v.name} = {v.number};")
+                lines.append("}")
+                lines.append("")
+            safe = fd.name.replace("/", "_")
+            with open(os.path.join(outdir, safe), "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
 
     print(f"decoded {decoded} descriptors into {outdir}\n")
     if services:

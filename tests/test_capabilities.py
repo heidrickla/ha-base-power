@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "base_power"))
 
-from api import LocationCapabilities  # noqa: E402
+from api import LocationCapabilities
 
 # Captured from the live API on 2026-09-13. The site has no solar, and note
 # what that looks like: no `hasSolar` key at all, not `"hasSolar": false`.

@@ -11,14 +11,14 @@ snapshot variant taking the integration down.
 from __future__ import annotations
 
 import sys
-from datetime import timezone
+from datetime import UTC
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "base_power"))
 
-from api import (  # noqa: E402
+from api import (
     BasePowerAuthError,
     BasePowerClient,
     BasePowerError,
@@ -55,7 +55,7 @@ def test_on_grid_is_the_normal_state():
     assert s.estimated_backup_hours_at_current_usage == 12.5
     assert s.observed_at is not None
     assert s.observed_at.tzinfo is not None
-    assert s.observed_at.astimezone(timezone.utc).hour == 1
+    assert s.observed_at.astimezone(UTC).hour == 1
 
 
 def test_the_on_grid_variant_carries_no_state_of_charge():
@@ -143,7 +143,13 @@ def test_wifi_rides_alongside_the_variant():
 # reproduced because they are not needed to pin the contract.
 LIVE_ON_GRID = {
     "snapshot": {
-        "wifi": {"status": "BATTERY_WIFI_CONNECTION_STATUS_CONNECTED", "observedAt": "2026-09-13T02:41:09.000Z"},
+        # CONNECTED, straight off the wire. Worth noting because docs/API.md
+        # spent a draft asserting this capture read NOT_CONNECTED, reasoning
+        # from string length instead of reading the fixture sitting here.
+        "wifi": {
+            "status": "BATTERY_WIFI_CONNECTION_STATUS_CONNECTED",
+            "observedAt": "2026-09-13T02:41:09.000Z",
+        },
         "onGrid": {
             "observedAt": "2026-09-13T02:41:09.000Z",
             "powerFlow": {

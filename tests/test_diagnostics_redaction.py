@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "base_power"))
 
-from api import BatterySnapshot  # noqa: E402
+from api import BatterySnapshot
 
 DIAG = Path(__file__).resolve().parents[1] / "custom_components" / "base_power" / "diagnostics.py"
 sys.path.insert(0, str(DIAG.parent))
@@ -36,7 +36,7 @@ def _snapshot_diagnostics(snapshot):
     src = DIAG.read_text(encoding="utf-8")
     start = src.index("def _snapshot_diagnostics")
     namespace: dict = {"Any": object, "asdict": __import__("dataclasses").asdict}
-    exec(compile(src[start:], str(DIAG), "exec"), namespace)  # noqa: S102
+    exec(compile(src[start:], str(DIAG), "exec"), namespace)
     return namespace["_snapshot_diagnostics"](snapshot)
 
 

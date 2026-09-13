@@ -21,7 +21,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "base_power"))
 
-from clerk import (  # noqa: E402
+from clerk import (
     ASSUMED_LIFETIME,
     CLERK_HOST,
     REFRESH_MARGIN,
@@ -178,7 +178,14 @@ async def test_a_refused_credential_is_an_auth_error_not_a_transport_one():
 async def test_a_mint_that_returns_no_jwt_is_an_auth_error():
     """200 with the wrong body. Without the jwt check this returns the string
     "None" as a bearer token and every API call fails 401 instead."""
-    session = FakeSession(client_ok(), FakeResponse(200, {"not_jwt": "x"}), client_ok(), FakeResponse(200, {}))
+    # Four responses because the first failed mint triggers the rediscover
+    # retry; the second mint has to fail too for the error to surface.
+    session = FakeSession(
+        client_ok(),
+        FakeResponse(200, {"not_jwt": "x"}),
+        client_ok(),
+        FakeResponse(200, {}),
+    )
     provider = ClerkSessionProvider(session, "__client_value")
     with pytest.raises(ClerkAuthError):
         await provider.async_get_token()
