@@ -59,6 +59,11 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
         # decide which entities exist at all - a solar sensor on a site
         # without solar would sit at unknown for ever and read as broken.
         self.capabilities = LocationCapabilities()
+        # Whether the battery was last seen reporting. None until the first
+        # poll, so a battery that is already silent at startup still gets a
+        # line rather than being mistaken for a transition that never
+        # happened.
+        self._telemetry_available: bool | None = None
 
     async def async_load_capabilities(self) -> None:
         """Ask the site what it has, before any entity is created.
@@ -77,9 +82,43 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
                 err,
             )
 
+    def _note_telemetry(self, snapshot: BatterySnapshot) -> None:
+        """Say once when the battery stops reporting, and once when it returns.
+
+        This is the condition that takes almost every entity unavailable while
+        the poll itself stays perfectly healthy, so without a line saying so
+        the logs show nothing at all and the integration looks broken when it
+        is working exactly as designed. Once per transition, not per poll:
+        at 30 s intervals that would be 2,880 identical lines a day.
+        """
+        available = snapshot.telemetry_available
+        if available == self._telemetry_available:
+            return
+        # Nothing is logged for the very first poll of a healthy battery -
+        # there is no transition worth reporting.
+        if self._telemetry_available is None and available:
+            self._telemetry_available = True
+            return
+        self._telemetry_available = available
+        if not available:
+            _LOGGER.warning(
+                "The Base Power battery is not reporting telemetry (state %s, "
+                "Wi-Fi %s). The connection to Base is fine - this poll succeeded - "
+                "so the battery itself is not sending data, and its entities are "
+                "unavailable rather than showing a stale or zero reading. Check "
+                "the battery's network connection; the Base app will show the "
+                "same gap",
+                snapshot.state,
+                snapshot.wifi_status or "unknown",
+            )
+        else:
+            _LOGGER.info("The Base Power battery is reporting telemetry again")
+
     async def _async_update_data(self) -> BatterySnapshot:
         try:
-            return await self.client.get_snapshot(self.address_id)
+            snapshot = await self.client.get_snapshot(self.address_id)
+            self._note_telemetry(snapshot)
+            return snapshot
         except BasePowerAuthError as err:
             # The API refused the token. A minted token can simply have aged
             # out mid-flight, so give the credential one chance to prove it
@@ -88,7 +127,12 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
             # two seconds early would be the wrong answer.
             try:
                 await self._auth.async_refresh()
-                return await self.client.get_snapshot(self.address_id)
+                snapshot = await self.client.get_snapshot(self.address_id)
+                # Same bookkeeping as the first-attempt path: a poll that only
+                # succeeded on the retry still observed the battery, and
+                # skipping it here would lose a transition.
+                self._note_telemetry(snapshot)
+                return snapshot
             except (BasePowerAuthError, ClerkAuthError) as retry_err:
                 raise ConfigEntryAuthFailed(
                     f"Base Power rejected the stored credential: {retry_err}"

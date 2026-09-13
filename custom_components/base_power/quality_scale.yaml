@@ -133,10 +133,16 @@ rules:
   integration-owner:
     status: done
   log-when-unavailable:
-    status: todo
+    status: done
     comment: |
-      The coordinator relies on DataUpdateCoordinator's own logging. A
-      once-per-outage line naming the cause has not been added.
+      DataUpdateCoordinator already logs a failing poll. What it cannot log
+      is the case that actually happens here: the poll SUCCEEDS and the
+      battery is simply not reporting, which takes almost every entity
+      unavailable while the logs stay silent and the integration looks
+      broken. The coordinator now says so once per transition - naming the
+      state and the battery Wi-Fi status, and saying the connection to Base
+      is fine - and once more when telemetry returns. Once per transition,
+      not per poll: at 30 s that would be 2,880 identical lines a day.
   parallel-updates:
     status: done
     comment: |
