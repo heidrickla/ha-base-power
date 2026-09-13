@@ -182,6 +182,38 @@ class BatterySnapshot:
 
 
 @dataclass(frozen=True)
+class LocationCapabilities:
+    """What a site actually has, as GetLocation declares it.
+
+    proto3 omits false booleans, so an absent key is a capability the site
+    does not have - which is why these default to False rather than None.
+    Confirmed live: a site without solar carries no `hasSolar` key at all,
+    and its snapshots omit `fromSolarKw` to match.
+    """
+
+    has_solar: bool = False
+    billing: bool = False
+    telemetry: bool = False
+    automatic_backup: bool = False
+    wifi_management: bool = False
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> LocationCapabilities:
+        location = data.get("location") if isinstance(data.get("location"), dict) else data
+        caps = location.get("capabilities") or {}
+        battery = location.get("battery") or {}
+        onsite = battery.get("onsite") or {}
+        battery_caps = onsite.get("capabilities") or {}
+        return cls(
+            has_solar=bool(caps.get("hasSolar")),
+            billing=bool(caps.get("billing")),
+            telemetry=bool(battery_caps.get("telemetry")),
+            automatic_backup=bool(battery_caps.get("automaticBackup")),
+            wifi_management=bool(battery_caps.get("wifiManagement")),
+        )
+
+
+@dataclass(frozen=True)
 class Location:
     """A site. Its `address_id` is what every other call is scoped by."""
 
@@ -247,6 +279,11 @@ class BasePowerClient:
 
     async def list_locations(self) -> list[Location]:
         return Location.list_from_json(await self.call("LocationsService", "ListLocations", {}))
+
+    async def get_capabilities(self, address_id: str) -> LocationCapabilities:
+        return LocationCapabilities.from_json(
+            await self.call("LocationsService", "GetLocation", {"addressId": address_id})
+        )
 
     async def get_snapshot(self, address_id: str) -> BatterySnapshot:
         return BatterySnapshot.from_json(

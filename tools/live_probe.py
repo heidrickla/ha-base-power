@@ -42,6 +42,7 @@ READ_ONLY = {
     ("BatteryService", "GetSnapshot"),
     ("UsageService", "GetRecentPower"),
     ("UsageService", "GetRecentGridVoltage"),
+    ("LocationsService", "GetLocation"),
 }
 
 
@@ -173,6 +174,7 @@ def main() -> None:
     ap.add_argument("creds")
     ap.add_argument("--snapshot", action="store_true", help="also call BatteryService/GetSnapshot")
     ap.add_argument("--usage", action="store_true", help="also call the read-only UsageService methods")
+    ap.add_argument("--location", action="store_true", help="also call LocationsService/GetLocation")
     a = ap.parse_args()
 
     creds = load_creds(a.creds)
@@ -203,6 +205,12 @@ def main() -> None:
         if aid:
             address_ids.append(aid)
     print(f"\naddress_id(s) found: {len(address_ids)}")
+
+    if a.location and address_ids:
+        print("\n=== LocationsService/GetLocation ===")
+        status, body = call("LocationsService", "GetLocation", {"addressId": address_ids[0]}, token)
+        print(f"HTTP {status}")
+        print(redact(body) if status == 200 else f"body: {body}")
 
     if a.usage and address_ids:
         for method in ("GetRecentPower", "GetRecentGridVoltage"):

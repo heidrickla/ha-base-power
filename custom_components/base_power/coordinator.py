@@ -16,7 +16,13 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import BasePowerAuthError, BasePowerClient, BasePowerError, BatterySnapshot
+from .api import (
+    BasePowerAuthError,
+    BasePowerClient,
+    BasePowerError,
+    BatterySnapshot,
+    LocationCapabilities,
+)
 from .clerk import ClerkAuthError, ClerkSessionProvider
 from .const import CONF_ADDRESS_ID, CONF_CLIENT_JWT, DEFAULT_SCAN_INTERVAL, DOMAIN
 
@@ -49,6 +55,27 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
         session = async_get_clientsession(hass)
         self._auth = ClerkSessionProvider(session, entry.data[CONF_CLIENT_JWT])
         self.client = BasePowerClient(session, self._auth.async_get_token)
+        # What the site declares it has. Read once at setup and used to
+        # decide which entities exist at all - a solar sensor on a site
+        # without solar would sit at unknown for ever and read as broken.
+        self.capabilities = LocationCapabilities()
+
+    async def async_load_capabilities(self) -> None:
+        """Ask the site what it has, before any entity is created.
+
+        A failure here is not fatal: the capabilities only widen or narrow
+        the entity set, and refusing to set the entry up because one extra
+        call failed would lose the battery sensors too. The default is the
+        conservative one - nothing declared.
+        """
+        try:
+            self.capabilities = await self.client.get_capabilities(self.address_id)
+        except (BasePowerError, ClerkAuthError) as err:
+            _LOGGER.warning(
+                "Could not read the site's capabilities (%s); continuing without the "
+                "capability-gated entities",
+                err,
+            )
 
     async def _async_update_data(self) -> BatterySnapshot:
         try:

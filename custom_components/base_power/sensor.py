@@ -151,7 +151,18 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     coordinator = entry.runtime_data
-    async_add_entities(BasePowerSensor(coordinator, entry, d) for d in SENSORS)
+    descriptions = [
+        d
+        for d in SENSORS
+        # The solar sensor exists only where the site declares solar. On a
+        # site without it the API omits fromSolarKw entirely, so the entity
+        # would sit at unknown for ever and read as broken - and "0 kW of
+        # solar" would be worse, being a measurement nobody made. Sites WITH
+        # solar get it, which is why this is a capability check and not an
+        # assumption either way.
+        if d.key != "power_from_solar" or coordinator.capabilities.has_solar
+    ]
+    async_add_entities(BasePowerSensor(coordinator, entry, d) for d in descriptions)
 
 
 class BasePowerSensor(BasePowerEntity, SensorEntity):
