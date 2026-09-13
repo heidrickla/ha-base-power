@@ -15,6 +15,9 @@ way the app does, so the 60 s expiry stops mattering.
 
     python tools/live_probe.py path/to/creds.txt [--snapshot]
 
+Keep that file OUTSIDE the repo and delete it when you are done: `client` is
+the durable credential, so the file is as good as the account until it is.
+
 Read-only by construction: it calls ListLocations, and GetSnapshot only with
 --snapshot. It can reach no method that changes anything - StartManualBackup
 and ResetOvercurrent are not wired here on purpose.
@@ -174,9 +177,7 @@ def redact(obj, depth=0):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("creds")
-    ap.add_argument(
-        "--snapshot", action="store_true", help="also call BatteryService/GetSnapshot"
-    )
+    ap.add_argument("--snapshot", action="store_true", help="also call BatteryService/GetSnapshot")
     ap.add_argument(
         "--usage", action="store_true", help="also call the read-only UsageService methods"
     )

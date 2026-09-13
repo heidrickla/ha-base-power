@@ -139,9 +139,7 @@ class ClerkSignIn:
 
     async def async_start(self, email: str) -> SignInAttempt:
         """Create the sign-in and ask Clerk to email a code."""
-        body, client_jwt = await self._post(
-            "/v1/client/sign_ins", {"identifier": email}, None
-        )
+        body, client_jwt = await self._post("/v1/client/sign_ins", {"identifier": email}, None)
         response = body.get("response") or body
         sign_in_id = response.get("id")
         if not sign_in_id:
@@ -157,8 +155,7 @@ class ClerkSignIn:
         email_address_id = _email_factor_id(response)
         if not email_address_id:
             raise ClerkSignInError(
-                "this account cannot sign in with an emailed code - it may be "
-                "Google or Apple only"
+                "this account cannot sign in with an emailed code - it may be Google or Apple only"
             )
 
         attempt = SignInAttempt(sign_in_id, email_address_id, client_jwt)
@@ -187,9 +184,7 @@ class ClerkSignIn:
         if status != STATUS_COMPLETE or not response.get("created_session_id"):
             raise ClerkSignInError(f"sign-in did not complete (status {status!r})")
         if not client_jwt:
-            raise ClerkSignInError(
-                "sign-in completed but Clerk returned no client credential"
-            )
+            raise ClerkSignInError("sign-in completed but Clerk returned no client credential")
         return client_jwt
 
 

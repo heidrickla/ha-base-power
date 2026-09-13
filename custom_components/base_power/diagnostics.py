@@ -58,9 +58,7 @@ async def async_get_config_entry_diagnostics(
             # once.
             "last_update_success": coordinator.last_update_success,
             "update_interval_seconds": (
-                coordinator.update_interval.total_seconds()
-                if coordinator.update_interval
-                else None
+                coordinator.update_interval.total_seconds() if coordinator.update_interval else None
             ),
             "last_exception": str(coordinator.last_exception)
             if coordinator.last_exception

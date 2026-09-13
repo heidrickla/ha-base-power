@@ -164,9 +164,7 @@ async def test_rate_limiting_is_not_reported_as_a_connection_failure():
 
 async def test_an_account_without_email_code_is_refused_clearly():
     """Social-only accounts exist; saying so beats a generic failure."""
-    session = FakeSession(
-        FakeResponse(200, created(factors=[{"strategy": "oauth_google"}]), AUTH)
-    )
+    session = FakeSession(FakeResponse(200, created(factors=[{"strategy": "oauth_google"}]), AUTH))
     with pytest.raises(ClerkSignInError, match="Google or Apple"):
         await ClerkSignIn(session).async_start("someone@example.test")
 

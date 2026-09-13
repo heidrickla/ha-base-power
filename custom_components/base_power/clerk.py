@@ -123,9 +123,7 @@ class ClerkSessionProvider:
             None,
         )
         if active is None:
-            raise ClerkAuthError(
-                "the stored credential has no active session; sign in again"
-            )
+            raise ClerkAuthError("the stored credential has no active session; sign in again")
         return str(active["id"])
 
     async def _async_mint(self, session_id: str) -> str:

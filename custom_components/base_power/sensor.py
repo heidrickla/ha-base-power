@@ -201,8 +201,5 @@ class BasePowerSensor(BasePowerEntity, SensorEntity):
         inserted a mixin. Saying the condition is saying what is meant.
         """
         if self.entity_description.key == "battery_state":
-            return (
-                self.coordinator.last_update_success
-                and self.coordinator.snapshot is not None
-            )
+            return self.coordinator.last_update_success and self.coordinator.snapshot is not None
         return super().available

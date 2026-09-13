@@ -84,16 +84,12 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
 
     # -------------------------------------------------------------- entry
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(step_id="user", menu_options=["email", "manual"])
 
     # ---------------------------------------------------- email and code
 
-    async def async_step_email(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_email(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             email = user_input[CONF_EMAIL].strip()
@@ -116,9 +112,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(step_id="email", data_schema=STEP_EMAIL, errors=errors)
 
-    async def async_step_code(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_code(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             if self._attempt is None:
@@ -157,9 +151,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
 
     # ------------------------------------------------------ manual paste
 
-    async def async_step_manual(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_manual(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             result = await self._async_finish_with_credential(
@@ -271,9 +263,7 @@ class BasePowerOptionsFlow(OptionsFlowWithReload):
     twice for one edit.
     """
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(data=user_input)
         current = self.config_entry.options.get(

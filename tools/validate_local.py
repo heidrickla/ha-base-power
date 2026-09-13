@@ -30,25 +30,60 @@ COMPONENT = ROOT / "custom_components" / "base_power"
 # omits a rule reads as complete; checking against the full list turns an
 # omission into a failure.
 ALL_RULES = {
-    "action-setup", "appropriate-polling", "brands", "common-modules",
-    "config-flow-test-coverage", "config-flow", "dependency-transparency",
-    "docs-actions", "docs-conditions", "docs-high-level-description",
-    "docs-installation-instructions", "docs-removal-instructions",
-    "docs-triggers", "entity-event-setup", "entity-unique-id",
-    "has-entity-name", "runtime-data", "test-before-configure",
-    "test-before-setup", "unique-config-entry",
-    "action-exceptions", "config-entry-unloading",
-    "docs-configuration-parameters", "docs-installation-parameters",
-    "entity-unavailable", "integration-owner", "log-when-unavailable",
-    "parallel-updates", "reauthentication-flow", "test-coverage",
-    "devices", "diagnostics", "discovery-update-info", "discovery",
-    "docs-data-update", "docs-examples", "docs-known-limitations",
-    "docs-supported-devices", "docs-supported-functions",
-    "docs-troubleshooting", "docs-use-cases", "dynamic-devices",
-    "entity-category", "entity-device-class", "entity-disabled-by-default",
-    "entity-translations", "exception-translations", "icon-translations",
-    "reconfiguration-flow", "repair-issues", "stale-devices",
-    "async-dependency", "inject-websession", "strict-typing",
+    "action-setup",
+    "appropriate-polling",
+    "brands",
+    "common-modules",
+    "config-flow-test-coverage",
+    "config-flow",
+    "dependency-transparency",
+    "docs-actions",
+    "docs-conditions",
+    "docs-high-level-description",
+    "docs-installation-instructions",
+    "docs-removal-instructions",
+    "docs-triggers",
+    "entity-event-setup",
+    "entity-unique-id",
+    "has-entity-name",
+    "runtime-data",
+    "test-before-configure",
+    "test-before-setup",
+    "unique-config-entry",
+    "action-exceptions",
+    "config-entry-unloading",
+    "docs-configuration-parameters",
+    "docs-installation-parameters",
+    "entity-unavailable",
+    "integration-owner",
+    "log-when-unavailable",
+    "parallel-updates",
+    "reauthentication-flow",
+    "test-coverage",
+    "devices",
+    "diagnostics",
+    "discovery-update-info",
+    "discovery",
+    "docs-data-update",
+    "docs-examples",
+    "docs-known-limitations",
+    "docs-supported-devices",
+    "docs-supported-functions",
+    "docs-troubleshooting",
+    "docs-use-cases",
+    "dynamic-devices",
+    "entity-category",
+    "entity-device-class",
+    "entity-disabled-by-default",
+    "entity-translations",
+    "exception-translations",
+    "icon-translations",
+    "reconfiguration-flow",
+    "repair-issues",
+    "stale-devices",
+    "async-dependency",
+    "inject-websession",
+    "strict-typing",
 }
 VALID_STATUS = {"done", "todo", "exempt"}
 
@@ -128,7 +163,7 @@ def main() -> int:
     # ------------------------------------------------- reserved ENUM states
     for domain_block in (strings.get("entity") or {}).values():
         for key, entry in domain_block.items():
-            for state in (entry.get("state") or {}):
+            for state in entry.get("state") or {}:
                 check(
                     state.lower() not in RESERVED_STATES,
                     f"{key} translates the reserved state {state!r}",
@@ -170,8 +205,7 @@ def main() -> int:
         unknown_rules = listed.keys() - ALL_RULES
         check(
             not missing_rules,
-            f"quality_scale.yaml omits {len(missing_rules)} rules: "
-            f"{sorted(missing_rules)[:6]}",
+            f"quality_scale.yaml omits {len(missing_rules)} rules: {sorted(missing_rules)[:6]}",
         )
         check(not unknown_rules, f"quality_scale.yaml has unknown rules: {sorted(unknown_rules)}")
         bad = {k: v for k, v in listed.items() if v not in VALID_STATUS}
@@ -194,9 +228,7 @@ def main() -> int:
     for py in COMPONENT.glob("*.py"):
         src = py.read_text(encoding="utf-8")
         translated_raises.update(
-            re.findall(
-                r"translation_domain=[^,]+,\s*translation_key=\"([a-z_]+)\"", src
-            )
+            re.findall(r"translation_domain=[^,]+,\s*translation_key=\"([a-z_]+)\"", src)
         )
     # The repair issue uses the same shape but lives under "issues".
     raised = translated_raises - set(strings.get("issues") or {})

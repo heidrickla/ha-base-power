@@ -34,8 +34,4 @@ class BasePowerEntity(CoordinatorEntity[BasePowerCoordinator]):
         stale number as current.
         """
         snapshot = self.coordinator.snapshot
-        return (
-            super().available
-            and snapshot is not None
-            and snapshot.telemetry_available
-        )
+        return super().available and snapshot is not None and snapshot.telemetry_available
