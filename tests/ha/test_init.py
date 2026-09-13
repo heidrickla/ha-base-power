@@ -146,6 +146,33 @@ async def test_an_interval_below_the_floor_is_raised_to_it(
     assert mock_entry.runtime_data.update_interval == timedelta(seconds=15)
 
 
+async def test_the_entity_ids_are_the_ones_the_readme_documents(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    """The README's automation examples are copy-paste, so a wrong id there
+    silently does nothing for the user. An earlier draft used a `base_power_`
+    prefix; the domain is not part of the id, the site name is.
+    """
+    await _setup(hass, mock_entry)
+    documented = {
+        "binary_sensor.home_grid_outage",
+        "binary_sensor.home_running_off_grid",
+        "sensor.home_battery_state",
+        "sensor.home_battery_wi_fi_network",
+        "sensor.home_estimated_backup_time",
+        "sensor.home_power_from_grid",
+        "sensor.home_power_from_storage",
+        "sensor.home_power_to_home",
+        "sensor.home_state_of_charge",
+        "sensor.home_stored_energy",
+    }
+    registry = er.async_get(hass)
+    created = {
+        e.entity_id for e in er.async_entries_for_config_entry(registry, mock_entry.entry_id)
+    }
+    assert created == documented, "the README's entity id list no longer matches"
+
+
 # ------------------------------------------------------- what is NOT created
 
 
@@ -168,6 +195,11 @@ async def test_a_site_with_solar_gets_the_sensor(
         client=_client(capabilities=LocationCapabilities(has_solar=True)),
     )
     assert _state(hass, "power_from_solar") is not None
+    registry = er.async_get(hass)
+    assert (
+        registry.async_get_entity_id("sensor", DOMAIN, f"{ADDRESS_ID}_power_from_solar")
+        == "sensor.home_power_from_solar"
+    )
 
 
 async def test_state_of_charge_is_unknown_while_on_grid(
