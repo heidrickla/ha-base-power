@@ -205,9 +205,10 @@ def _credential_from(headers: Any) -> str | None:
     sign-in.
     """
     for name in ("Authorization", "Clerk-Db-Jwt"):
-        value = headers.get(name)
-        if not value:
+        raw = headers.get(name)
+        if not raw:
             continue
+        value = str(raw)
         if value.lower().startswith("bearer "):
             value = value[7:]
         value = value.strip()
@@ -220,7 +221,8 @@ def _email_factor_id(response: dict[str, Any]) -> str | None:
     """The email_address_id of the email_code factor, if the account has one."""
     for factor in response.get("supported_first_factors") or []:
         if isinstance(factor, dict) and factor.get("strategy") == EMAIL_CODE:
-            return factor.get("email_address_id")
+            factor_id = factor.get("email_address_id")
+            return str(factor_id) if factor_id else None
     return None
 
 

@@ -74,3 +74,14 @@ def test_a_battery_that_is_not_onsite_declares_no_battery_capabilities():
     caps = LocationCapabilities.from_json(data)
     assert caps.telemetry is False
     assert caps.automatic_backup is False
+
+
+def test_a_capabilities_field_of_the_wrong_type_declares_nothing():
+    """This parser decides whether the solar sensor exists at all, and it runs
+    once at setup. A shape it did not expect has to come out as "declares
+    nothing" - a setup that raises here is a setup that never completes."""
+    data = {"location": {"battery": "unavailable", "capabilities": ["billing"]}}
+    caps = LocationCapabilities.from_json(data)
+    assert caps.has_solar is False
+    assert caps.billing is False
+    assert caps.telemetry is False

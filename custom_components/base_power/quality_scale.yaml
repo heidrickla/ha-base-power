@@ -24,9 +24,19 @@ rules:
       of the integration. The floor on the user-configurable interval is 15 s
       for the same reason.
   brands:
-    status: todo
+    status: done
     comment: |
-      No brand images yet. Base Power is not in home-assistant/brands.
+      Six images under brand/ here in the integration directory: icon 256x256,
+      icon@2x 512x512, logo and dark_logo 512x256 with @2x at 1024x512. Home
+      Assistant serves them from there at /api/brands/integration/base_power/,
+      which takes priority over the CDN, so nothing needs submitting to
+      home-assistant/brands for these to appear.
+
+      Confirmed serving by BYTE COMPARISON, not status code, with two other
+      integrations as controls on the same call. That distinction is the whole
+      finding: brands.home-assistant.io answers 200 for a domain it has never
+      heard of, returning a 3039-byte "icon not available" placeholder. A
+      status-code check reports success while the user still sees a grey box.
   common-modules:
     status: done
     comment: |
@@ -335,6 +345,23 @@ rules:
   strict-typing:
     status: todo
     comment: |
-      The modules are annotated but mypy --strict has not been run, because
-      Home Assistant is not installable on the host this was built on and
-      its stubs are what the HA-facing signatures would be checked against.
+      Partly verified, and the split is worth stating exactly.
+
+      mypy --strict passes clean on the four modules that import no Home
+      Assistant at all - api, clerk, clerk_signin, const - which is where the
+      parsing lives and where a type error would be a real defect. It found
+      eleven, all genuine: ten possibly-None dict walks in api.py and one
+      Any-return in clerk_signin.py. Both are fixed, and one of them was a
+      live crash (a wrongly-typed `battery` key raised AttributeError through
+      LocationCapabilities.from_json, which runs at setup).
+
+      It has NOT been run over the HA-facing layer - __init__, coordinator,
+      config_flow, sensor, binary_sensor, entity, diagnostics. Home Assistant
+      is not installable on the host this was built on, so those imports do
+      not resolve and every HA base class degrades to Any; the three errors
+      mypy reports there (a subclass-of-Any and two Any-returns) are artefacts
+      of the missing stubs, not findings. Checking that half needs a Linux
+      environment with homeassistant installed.
+
+      To reproduce the part that is verified:
+        mypy --strict custom_components/base_power/{api,clerk,clerk_signin,const}.py

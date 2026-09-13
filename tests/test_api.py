@@ -227,6 +227,18 @@ def test_a_malformed_timestamp_does_not_cost_the_reading():
     assert s.state_of_energy_percent == 42
 
 
+@pytest.mark.parametrize("wrong", ["a string", 7, [], True])
+def test_a_nested_object_of_the_wrong_type_does_not_raise(wrong):
+    """`wifi` is read for two diagnostic fields nobody would miss. It must not
+    be able to take the reading beside it down, so anything that is not an
+    object is treated as absent rather than walked into."""
+    data = {"snapshot": {"onGrid": {"powerFlow": {"toHomeKw": 1.5}}, "wifi": wrong}}
+    s = BatterySnapshot.from_json(data)
+    assert s.state == "on_grid"
+    assert s.power_flow.to_home_kw == 1.5
+    assert s.wifi_ssid is None
+
+
 # -------------------------------------------------------------------- locations
 
 

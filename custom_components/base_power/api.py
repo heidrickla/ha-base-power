@@ -90,6 +90,18 @@ def _as_int(value: Any) -> int | None:
     return None if f is None else int(f)
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    """A nested message if it is one, an empty mapping otherwise.
+
+    Every one of these parsers walks into objects Base may simply not have
+    sent, and `x.get("k") or {}` is only safe while the value is a mapping or
+    absent - a string there raises AttributeError two lines later. This makes
+    "not the shape I expected" and "not present" the same outcome, which is
+    what the callers already assume.
+    """
+    return value if isinstance(value, dict) else {}
+
+
 @dataclass(frozen=True)
 class PowerFlow:
     """BatteryPowerFlow, all kW.
@@ -155,8 +167,9 @@ class BatterySnapshot:
         exception: a shape this has never observed live must degrade to "I do
         not know", not take the integration down.
         """
-        snapshot = data.get("snapshot") if isinstance(data.get("snapshot"), dict) else data
-        wifi = snapshot.get("wifi") if isinstance(snapshot.get("wifi"), dict) else {}
+        nested = data.get("snapshot")
+        snapshot = nested if isinstance(nested, dict) else data
+        wifi = _as_dict(snapshot.get("wifi"))
 
         for wire_key, state in SNAPSHOT_STATES.items():
             variant = snapshot.get(wire_key)
@@ -199,11 +212,12 @@ class LocationCapabilities:
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> LocationCapabilities:
-        location = data.get("location") if isinstance(data.get("location"), dict) else data
-        caps = location.get("capabilities") or {}
-        battery = location.get("battery") or {}
-        onsite = battery.get("onsite") or {}
-        battery_caps = onsite.get("capabilities") or {}
+        nested = data.get("location")
+        location = nested if isinstance(nested, dict) else data
+        caps = _as_dict(location.get("capabilities"))
+        battery = _as_dict(location.get("battery"))
+        onsite = _as_dict(battery.get("onsite"))
+        battery_caps = _as_dict(onsite.get("capabilities"))
         return cls(
             has_solar=bool(caps.get("hasSolar")),
             billing=bool(caps.get("billing")),
@@ -226,7 +240,7 @@ class Location:
         for loc in data.get("locations") or []:
             if not isinstance(loc, dict):
                 continue
-            summary = loc.get("summary") if isinstance(loc.get("summary"), dict) else {}
+            summary = _as_dict(loc.get("summary"))
             address_id = (
                 loc.get("addressId")
                 or summary.get("addressId")

@@ -8,7 +8,47 @@ requires-python = ">=3.12"
 # Connect RPC, whose JSON codec needs no protobuf runtime, and the HTTP client
 # is the aiohttp session Home Assistant provides. These are for the tests only.
 [dependency-groups]
-dev = ["pytest", "pytest-asyncio"]
+dev = ["pytest", "pytest-asyncio", "mypy"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# Only the modules that import no Home Assistant can be checked off a host
+# without it installed; the HA-facing half needs HA's own stubs. See the
+# strict-typing entry in quality_scale.yaml for what that does and does not
+# cover.
+files = [
+    "custom_components/base_power/api.py",
+    "custom_components/base_power/clerk.py",
+    "custom_components/base_power/clerk_signin.py",
+    "custom_components/base_power/const.py",
+]
+# Without homeassistant installed these resolve to nothing and every base
+# class becomes Any. Silencing the import errors keeps the four modules above
+# readable; it does not make the HA layer checked.
+[[tool.mypy.overrides]]
+module = "homeassistant.*"
+ignore_missing_imports = true
+
+# The package __init__ imports the HA-facing modules, so mypy pulls them in
+# whether or not they are listed above. Every error it reports in them is an
+# artefact of homeassistant being absent - a base class that degraded to Any,
+# and returns inferred from it - not a finding.
+#
+# REMOVE THIS BLOCK once the checks run somewhere homeassistant is installed.
+# Until then it is the reason the HA layer reads green, and a green run here
+# says nothing at all about those seven modules.
+[[tool.mypy.overrides]]
+module = [
+    "base_power",
+    "base_power.coordinator",
+    "base_power.config_flow",
+    "base_power.sensor",
+    "base_power.binary_sensor",
+    "base_power.entity",
+    "base_power.diagnostics",
+]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 # The Clerk sign-in and API clients are async, and their tests are plain async
