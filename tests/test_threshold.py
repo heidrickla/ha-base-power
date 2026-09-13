@@ -1,15 +1,13 @@
 """The repair-issue threshold.
 
-This is the number that was wrong once. The first version was five minutes,
-calibrated against "the battery has gone dark" when what it actually measures
-is "the snapshot has gone stale" - and on a cellular-connected battery the
-latter happens roughly every ten minutes in normal service. It would have told
-the owner to contact their vendor several times an hour.
+What is pinned is the property, not the arithmetic: the threshold is a
+duration and stays that duration as the user changes the poll interval. A
+fixed poll count would mean five minutes at one end of the range and ninety at
+the other.
 
-So what is pinned here is not the arithmetic for its own sake but the property
-that matters: the threshold is a DURATION, and it stays that duration as the
-user changes the poll interval. A fixed poll COUNT would have meant five
-minutes at one end of the range and ninety at the other.
+An earlier five-minute version measured "the snapshot has gone stale" while
+calibrated against "the battery has gone dark". On cellular the former happens
+roughly every ten minutes in normal service.
 """
 
 from __future__ import annotations

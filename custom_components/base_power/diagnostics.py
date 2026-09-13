@@ -1,20 +1,15 @@
 """Diagnostics for Base Power.
 
-What a report needs to be useful: which contract the API answered with, what
-the coordinator believes, and why an entity is missing or unavailable. What it
-must never contain: the credential, or where the user lives.
+A report carries which contract the API answered with, what the coordinator
+believes, and why an entity is missing or unavailable.
 
-Redaction here is deliberate rather than reflexive. The client credential and
-any minted session JWT are live secrets and are not included at all - not
-truncated, not masked, absent. The street address and the battery's Wi-Fi
-SSID identify a household, and nothing about diagnosing this integration
-needs them.
+The client credential and any minted session JWT are absent, not truncated or
+masked. The street address and the battery's Wi-Fi SSID identify a household
+and diagnose nothing, so they are absent too.
 
-The address id gets a middle answer. It is opaque, but it is a stable
-identifier of one person's home and this output lands in bug reports, so the
-raw value does not appear. What appears is a short digest of it, which is
-enough to tell two entries apart and to correlate a report with a log line,
-and is not the identifier itself.
+The address id appears only as a short digest. It is opaque but stable, this
+output lands in bug reports, and a digest is enough to tell two entries apart
+and correlate a report with a log line.
 """
 
 from __future__ import annotations

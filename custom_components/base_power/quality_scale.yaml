@@ -46,31 +46,29 @@ rules:
   config-flow-test-coverage:
     status: done
     comment: |
-      config_flow.py: 129 statements, 0 missed, 100%. Measured, not estimated.
+      config_flow.py: 129 statements, 0 missed, 100%.
 
-      32 tests in tests/ha/test_config_flow.py, and most of them are error
-      branches rather than the happy path, because this is the one part of the
-      integration a user drives by hand and the failure modes are expensive:
+      32 tests in tests/ha/test_config_flow.py, mostly error branches. This is
+      the one part a user drives by hand, and its failures are expensive:
       requesting a code sends a real email, and a wrong-code path that
-      silently re-requests is what rate-limits somebody's account.
+      re-requests will rate-limit the account.
 
-      What is pinned, beyond each step succeeding:
+      Pinned, beyond each step succeeding:
 
-      - a wrong code re-shows the SAME screen, so a retry does not request a
+      - a wrong code re-shows the same screen, so a retry does not request a
         second code
-      - an expired or rate-limited code returns to the email step instead,
-        because retyping a dead code can never work
+      - an expired or rate-limited code returns to the email step, because
+        retyping a dead code cannot work
       - each Clerk failure maps to its own message: unknown_email,
         code_expired, too_many_requests, signin_failed, unknown. They tell the
-        user different things to do, so collapsing them would be the
-        difference between "use the other option" and "wait five minutes"
-      - invalid_auth vs cannot_connect, which decides whether someone
+        user different things to do.
+      - invalid_auth against cannot_connect, which decides whether someone
         re-copies a credential or waits for Base to come back
-      - an account with a valid credential and no sites is no_locations, NOT
-        an auth failure
+      - a valid credential on an account with no sites is no_locations, not an
+        auth failure
       - a second entry for the same address id aborts as already_configured
-      - reauth reuses the stored email, and falls back to asking for one on an
-        entry created before it was stored
+      - reauth reuses the stored email, and asks for one on an entry created
+        before it was stored
       - the options flow refuses an interval outside 15-3600
   config-flow:
     status: done
@@ -199,8 +197,7 @@ rules:
   test-coverage:
     status: done
     comment: |
-      136 tests, 96% of the component, against Home Assistant 2026.9.2 - the
-      version this actually runs on, not an approximation of it.
+      136 tests, 96% of the component, against Home Assistant 2026.9.2.
 
         __init__      100%   config_flow   100%   entity      100%
         binary_sensor 100%   const         100%   clerk       100%
@@ -208,44 +205,35 @@ rules:
         diagnostics    89%   api            88%
 
       The remainder in api.py is the HTTP transport, exercised live rather
-      than mocked; see the live-confirmation notes in docs/API.md.
+      than mocked.
 
-      TWO SUITES, DELIBERATELY SEPARATE, and the separation is the point:
+      Two suites, separate on purpose. tests/ imports the parsing layer by
+      path and runs with no Home Assistant installed. That is the check, not a
+      Windows workaround: if an HA import reaches api.py or clerk.py, that
+      suite stops running. tests/ha needs a real Home Assistant; the root
+      conftest skips it when the harness is absent and prints which half ran,
+      so a partial run is not mistaken for a full one.
 
-      tests/ imports the parsing layer BY PATH and runs with no Home Assistant
-      installed at all. That is not a workaround for a Windows host, it is the
-      check - if an HA import ever creeps into api.py or clerk.py, that suite
-      stops running and says so, which no amount of mocking would reveal.
-
-      tests/ha needs a real Home Assistant. The root conftest skips it when
-      the harness is absent and prints which half ran in the pytest header, so
-      a partial run cannot be mistaken for a full one.
-
-      What tests/ha pins is mostly ABSENCE, because that is where a wrong
-      guess is invisible - a plausible number reads exactly like a real one:
+      tests/ha mostly pins absence, where a wrong guess is invisible:
 
       - no telemetry makes every value entity unavailable while battery_state
         stays available to say why
-      - no solar sensor is CREATED at all on a site without solar
-      - state_of_charge is unknown while on grid, which is correct
+      - no solar sensor is created on a site without solar
+      - state_of_charge is unknown while on grid
       - a failed poll goes unavailable rather than holding a stale kW figure
       - the repair issue waits the full 30 minutes, driven by real polls at
-        the real interval rather than one clock jump, because the threshold is
-        a duration converted to a poll count and a single jump is one poll
+        the real interval. The threshold is a duration converted to a poll
+        count, so one clock jump is one poll, not sixty.
       - diagnostics carry no credential, no SSID and no address id, checked
-        through the real endpoint a user downloads
+        through the endpoint a user downloads
       - an interval below the floor is raised to it even if .storage is edited
         by hand
+      - a negative from_storage reaches a sensor at -0.3 kW, so the signed
+        sensor is not clamping
 
-      A NEGATIVE from_storage NOW REACHES A SENSOR: the 02:41 fixture carries
-      -0.3 kW and the entity reads -0.3. That was the last gap in the
-      signed-sensor decision and it is closed - the sensor is not clamping.
-
-      Still resting on live observation rather than tests: the three
-      cross-checks that say the numbers are real (power flow balancing to
-      0.000 kW, the stored-energy derivation to 0.4%, to_home within 1.9% of a
-      different vendor's CTs). Tests prove the code does what it means to;
-      only the live comparison proves the contract itself was read correctly.
+      Not covered by tests: the three live cross-checks in docs/API.md. Tests
+      prove the code does what it means to; only the live comparison proves
+      the contract was read correctly.
 
   # Gold
   devices:
@@ -396,32 +384,24 @@ rules:
 
         mypy==1.18.2 --strict custom_components/base_power
 
-      The gate is PROVEN NON-VACUOUS in both halves: a planted
-      `def f(x: int) -> str: return x` was caught in api.py and again in
-      coordinator.py, the HA-facing module that could not be checked at all
-      before. A clean run that cannot fail is not a clean run.
+      The gate is verified non-vacuous in both halves: a planted
+      `def f(x: int) -> str: return x` is caught in api.py and in
+      coordinator.py.
 
-      Fourteen real errors found and fixed, and they split in a way worth
-      recording:
+      Fourteen errors found and fixed. Eleven in the pure layer: ten
+      possibly-None dict walks in api.py and an Any-return in clerk_signin.py.
+      One of those was a live crash, where a wrongly typed `battery` key
+      raised AttributeError through LocationCapabilities.from_json, which runs
+      at setup, so the entry would never finish loading. Three in the HA
+      layer: __init__ signatures in sensor.py and binary_sensor.py missing the
+      annotations their base class already had.
 
-      - Eleven in the pure layer - ten possibly-None dict walks in api.py and
-        an Any-return in clerk_signin.py. ONE WAS A LIVE CRASH: a wrongly
-        typed `battery` key raised AttributeError through
-        LocationCapabilities.from_json, which runs at setup, so the failure
-        mode was a config entry that never finishes loading.
-      - Three in the HA layer, all the same shape: __init__ signatures in
-        sensor.py and binary_sensor.py that omitted the annotations their own
-        base class already had.
+      Requires Linux with homeassistant installed; Home Assistant needs fcntl
+      and will not install on Windows. The interpreter constraint fails
+      silently: every pytest-homeassistant-custom-component from 0.13.317
+      requires Python >=3.14, so on 3.13 pip resolves an old Home Assistant
+      instead of refusing.
 
-      Checking this half at all needed Linux with homeassistant installed;
-      Home Assistant requires fcntl and will not install on Windows. Note the
-      interpreter constraint, which is easy to get wrong silently: every
-      pytest-homeassistant-custom-component from 0.13.317 requires Python
-      >=3.14, so on 3.13 pip resolves an OLD Home Assistant instead of
-      refusing, and you end up type-checking against the wrong version
-      without being told.
-
-      pyproject.toml still carries a narrower mypy config for running on
-      Windows - four modules, with the HA-facing ones silenced by name. That
-      exists so a partial check is possible where no full one can be, and its
-      comments say so; the command above is the one that means something.
+      pyproject.toml carries a narrower mypy config for Windows: four modules,
+      with the HA-facing ones silenced by name. The command above is the one
+      that covers everything.

@@ -1,18 +1,16 @@
 """Clerk session tokens for the Base Power API.
 
-Base authenticates with Clerk and issues **two** credentials. The bearer JWT
-the API wants (`__session`) lives about 60 seconds, which is useless to store.
-The durable one is the client credential (`__client`), and it mints fresh
-session JWTs on demand - which is what the mobile app does, and what this
-does.
+Base authenticates with Clerk and issues two credentials. The bearer JWT the
+API wants (`__session`) lives about 60 seconds, which is useless to store. The
+durable one is the client credential (`__client`), which mints fresh session
+JWTs on demand, as the mobile app does.
 
 Four things Clerk's frontend API requires, each established by being refused
-without it (see `docs/API.md`):
+without it:
 
 - the path is `GET /v1/client`, not `/v1/client/sync`
 - the API-version query parameters must be present
-- `Origin` must be set, and `Authorization` must NOT be sent alongside it -
-  Clerk rejects both together outright
+- `Origin` must be set, and `Authorization` must not be sent alongside it
 - a browser `User-Agent`; the identical request is refused 403 as
   `Python-urllib`
 

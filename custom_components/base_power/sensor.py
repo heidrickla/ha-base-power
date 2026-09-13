@@ -1,14 +1,12 @@
 """Sensors for Base Power.
 
-The power flow is the useful part and it is signed: a negative
-`from_storage_kw` is the battery charging. That is one sensor covering both
-directions, which is what Home Assistant's energy handling expects, rather
-than two sensors that are each wrong half the time.
+The power flow is signed: a negative `from_storage_kw` is the battery
+charging. One sensor covers both directions, which is what Home Assistant's
+energy handling expects.
 
-Values the API omits stay `None` and the entity reads `unknown`. That matters
-more than it sounds: a site with no solar does not receive `fromSolarKw: 0.0`,
-it receives nothing at all, and a solar sensor sitting at a confident zero is
-indistinguishable from a real measurement.
+Values the API omits stay `None` and the entity reads `unknown`. A site with
+no solar receives nothing rather than `fromSolarKw: 0.0`, and a sensor at a
+confident zero is indistinguishable from a real measurement.
 """
 
 from __future__ import annotations

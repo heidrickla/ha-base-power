@@ -1,15 +1,13 @@
 """The session-token provider, against faked Clerk responses.
 
-This is the auth hot path: every poll goes through async_get_token, so a
-mistake here is not one bad reading but an integration that stops working and
-does not say why.
+The auth hot path: every poll goes through async_get_token, so a mistake here
+is an integration that stops working and does not say why.
 
-The property most of these pin is narrower than "it parses": a Clerk response
-this code did not expect must raise **ClerkAuthError**. That exception is what
-starts reauthentication - it is the one the entry translates into "sign in
-again". Any other exception escapes as an unexpected error, the user is never
-prompted, and the integration simply stays broken. So "degrades to sign in
-again" is the contract, not "does not crash".
+The contract these pin is "degrades to sign in again", not "does not crash".
+An unexpected Clerk response must raise ClerkAuthError, which is what the
+entry translates into a reauth prompt. Any other exception escapes as an
+unexpected error, the user is never prompted, and the integration stays
+broken.
 """
 
 from __future__ import annotations

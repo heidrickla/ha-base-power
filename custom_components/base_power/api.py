@@ -2,17 +2,16 @@
 
 Connect RPC over HTTP to `dashboard.baseapis.net`, package
 `dashboard.mobile.v2`. Connect's JSON codec is used rather than protobuf, so
-this needs no protobuf runtime: the wire is ordinary JSON with lowerCamelCase
-field names, and `docs/API.md` plus `proto/` are the authoritative contract.
+no protobuf runtime is needed: the wire is JSON with lowerCamelCase field
+names, and `docs/API.md` plus `proto/` are the authoritative contract.
 
-Everything that parses a response is a pure function, so the shapes can be
-tested without a network or a token. The transport is a thin wrapper over an
-aiohttp session.
+Everything that parses a response is a pure function, testable without a
+network or a token. The transport is a thin wrapper over an aiohttp session.
 
-**None of this has been run against the live service.** The shapes come from
-the descriptors embedded in the app, so the first real call is also the first
-test of them; `BatterySnapshot.from_json` is deliberately tolerant about
-fields it has never seen populated.
+The shapes come from descriptors embedded in the app. `GetSnapshot`,
+`ListLocations` and `GetLocation` are confirmed live; the rest are still
+readings of the binary, so the parsers stay tolerant of fields they have never
+seen populated.
 """
 
 from __future__ import annotations
@@ -24,9 +23,8 @@ from typing import Any
 DEFAULT_HOST = "https://dashboard.baseapis.net"
 PACKAGE = "dashboard.mobile.v2"
 
-# BatterySnapshot is a union: exactly one of these keys is populated, and
-# which one IS the battery's operating state. JSON uses lowerCamelCase.
-# Order matters only for reporting; the wire sets one.
+# BatterySnapshot is a union: exactly one key is populated, and which one is
+# the battery's operating state. JSON uses lowerCamelCase.
 SNAPSHOT_STATES: dict[str, str] = {
     "onGrid": "on_grid",
     "offGridOutage": "off_grid_outage",
@@ -36,8 +34,8 @@ SNAPSHOT_STATES: dict[str, str] = {
     "telemetryUnavailable": "telemetry_unavailable",
 }
 
-# The states in which the house is running off the battery rather than the
-# grid. `off_grid_outage` is the one an automation actually wants.
+# Running off the battery rather than the grid. `off_grid_outage` is the one
+# an automation usually wants.
 OFF_GRID_STATES = frozenset(
     {
         "off_grid_outage",
@@ -63,9 +61,8 @@ class BasePowerAuthError(BasePowerError):
 def _parse_timestamp(value: Any) -> datetime | None:
     """A google.protobuf.Timestamp as Connect JSON renders it: RFC 3339.
 
-    Returns None rather than raising: a missing or unparseable observation
-    time must not cost the reading beside it, which is the thing being
-    reported.
+    None rather than raising: an unparseable observation time must not cost
+    the reading beside it.
     """
     if not isinstance(value, str) or not value:
         return None
@@ -93,11 +90,10 @@ def _as_int(value: Any) -> int | None:
 def _as_dict(value: Any) -> dict[str, Any]:
     """A nested message if it is one, an empty mapping otherwise.
 
-    Every one of these parsers walks into objects Base may simply not have
-    sent, and `x.get("k") or {}` is only safe while the value is a mapping or
-    absent - a string there raises AttributeError two lines later. This makes
-    "not the shape I expected" and "not present" the same outcome, which is
-    what the callers already assume.
+    `x.get("k") or {}` is only safe while the value is a mapping or absent; a
+    string there raises AttributeError two lines later. This makes "not the
+    shape I expected" and "not present" the same outcome, which is what the
+    callers assume.
     """
     return value if isinstance(value, dict) else {}
 
@@ -106,10 +102,9 @@ def _as_dict(value: Any) -> dict[str, Any]:
 class PowerFlow:
     """BatteryPowerFlow, all kW.
 
-    Absent fields stay None rather than becoming 0.0: "no solar reported" and
-    "solar is producing nothing" are different claims, and a power sensor
-    that reads a confident zero for a value the panel never sent is the
-    failure this avoids.
+    Absent fields stay None rather than 0.0. "No solar reported" and "solar is
+    producing nothing" are different claims, and a sensor reading a confident
+    zero for a value nobody sent is indistinguishable from a real one.
     """
 
     from_grid_kw: float | None = None
@@ -161,11 +156,10 @@ class BatterySnapshot:
     def from_json(cls, data: dict[str, Any]) -> BatterySnapshot:
         """Flatten GetBatterySnapshotResponse.
 
-        The response nests the union under `snapshot`, but callers have been
-        seen to hand either the outer or the inner object, so accept both.
-        An unrecognised or absent variant becomes `unknown` rather than an
-        exception: a shape this has never observed live must degrade to "I do
-        not know", not take the integration down.
+        The response nests the union under `snapshot`, but callers hand either
+        the outer or the inner object, so accept both. An unrecognised variant
+        becomes `unknown` rather than raising: a shape never observed live must
+        degrade to "I do not know", not take the integration down.
         """
         nested = data.get("snapshot")
         snapshot = nested if isinstance(nested, dict) else data
@@ -196,12 +190,12 @@ class BatterySnapshot:
 
 @dataclass(frozen=True)
 class LocationCapabilities:
-    """What a site actually has, as GetLocation declares it.
+    """What a site has, as GetLocation declares it.
 
     proto3 omits false booleans, so an absent key is a capability the site
-    does not have - which is why these default to False rather than None.
-    Confirmed live: a site without solar carries no `hasSolar` key at all,
-    and its snapshots omit `fromSolarKw` to match.
+    does not have, which is why these default to False rather than None.
+    Confirmed live: a site without solar carries no `hasSolar` key at all and
+    its snapshots omit `fromSolarKw` to match.
     """
 
     has_solar: bool = False
@@ -262,9 +256,8 @@ class BasePowerClient:
     """Thin Connect-RPC client.
 
     `token_provider` is an async callable returning a current Clerk session
-    token. It is a callable rather than a stored string because those tokens
-    are short-lived, so the caller owns refresh and this class never holds a
-    stale one.
+    token. A callable rather than a string because those tokens live ~60 s, so
+    the caller owns refresh and this never holds a stale one.
     """
 
     def __init__(self, session: Any, token_provider: Any, host: str = DEFAULT_HOST) -> None:
@@ -316,15 +309,13 @@ class BasePowerClient:
 def _samples(data: dict[str, Any]) -> list[dict[str, Any]]:
     """The sample list out of a usage response, dicts only.
 
-    `list(data.get("samples") or [])` looked equivalent and is not: it raises
-    TypeError on a non-iterable, and on a string it returns the right TYPE
-    holding the wrong THING - list("abc") is three strings, handed back past a
-    signature promising dicts. mypy cannot see either, because the value is
-    Any and Any is iterable as far as it knows.
+    `list(data.get("samples") or [])` is not equivalent: it raises TypeError on
+    a non-iterable, and on a string returns the right type holding the wrong
+    thing, since list("abc") is three strings past a signature promising dicts.
+    mypy sees neither, because the value is Any and Any is iterable.
 
-    These are the two methods that return empty for the site this was built
-    against, so their populated shape has never been observed and the
-    annotation is a guess until it has been.
+    These two methods return empty for the site this was built against, so the
+    populated shape is unobserved and the annotation is a guess.
     """
     samples = data.get("samples")
     if not isinstance(samples, list):
@@ -335,10 +326,10 @@ def _samples(data: dict[str, Any]) -> list[dict[str, Any]]:
 def _error_for(status: int, body: Any) -> BasePowerError:
     """Map a Connect error body to an exception.
 
-    Connect reports failures as a JSON object with `code` and `message`, and
-    uses ordinary HTTP statuses alongside. 401/403, and Connect's own
-    `unauthenticated`/`permission_denied`, are the token being short-lived
-    rather than a fault, so they get their own type.
+    Connect reports failures as JSON with `code` and `message`, alongside
+    ordinary HTTP statuses. 401/403 and Connect's `unauthenticated` /
+    `permission_denied` mean the short-lived token expired rather than a
+    fault, so they get their own type.
     """
     code = ""
     message = ""

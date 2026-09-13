@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Local stand-in for the checks CI would run, for a host without Home Assistant.
+"""Checks that run from the files alone, for a host without Home Assistant.
 
 Home Assistant needs `fcntl` and will not install on Windows, so nothing here
-imports it. What this checks is everything that can be checked from the files
-themselves - manifest sanity, translation coverage, reserved states, the
+imports it. Covers manifest sanity, translation coverage, reserved states, the
 quality-scale rule list, and the redaction promises diagnostics.py makes.
 
-It deliberately does NOT claim to prove the integration loads. That needs a
-real Home Assistant and is tracked as the open gap in docs/API.md; a validator
-that printed "all checks passed" while the integration could not be imported
-would be worse than no validator.
+It does not prove the integration loads; that needs a real Home Assistant and
+is what tests/ha does. A validator printing "all checks passed" while the
+integration could not be imported would be worse than none.
 
     python tools/validate_local.py
 """

@@ -1,10 +1,9 @@
 """Fixtures for the tests that need a real Home Assistant.
 
-Everything in tests/ha runs against pytest-homeassistant-custom-component, so
-it needs a Linux host with Home Assistant installed. The tests one directory
-up deliberately do NOT - they import the parsing layer by path and must keep
-running anywhere. Keeping the two apart is what makes "a Home Assistant import
-crept into api.py" a visible failure rather than a silent one.
+tests/ha runs against pytest-homeassistant-custom-component and needs a Linux
+host with Home Assistant installed. The tests one directory up do not, and
+keeping the two apart is what makes an HA import creeping into api.py a
+visible failure.
 """
 
 from __future__ import annotations

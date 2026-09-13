@@ -1,20 +1,16 @@
 """Config flow for Base Power.
 
-Sign-in is passwordless: Clerk emails a code. So the normal path is two steps
-- type your email, type the code - and nobody has to open developer tools to
-copy a cookie out of a browser.
+Sign-in is passwordless, so the normal path is two steps: type the email, type
+the code Clerk sends. Nobody has to copy a cookie out of developer tools.
 
-The pasted credential survives as a demoted second option rather than being
-deleted, because there are three cases the email route does not cover: an
-account that signs in only with Google or Apple, an account with two-factor
-turned on, and a Clerk change that breaks the code flow before anyone can
-ship a fix. Keeping a manual path costs one menu entry and is the difference
-between "degraded" and "unusable".
+The pasted credential stays as a demoted second option because the email route
+cannot cover three cases: an account that signs in only with Google or Apple,
+an account with two-factor turned on, and a Clerk change that breaks the code
+flow before a fix can ship.
 
-What gets stored does not change either way: `entry.data` holds the durable
-Clerk client credential exactly as before, so `ClerkSessionProvider`, the API
-client and the coordinator are untouched. This is a new way to OBTAIN the
-credential, not a new credential model.
+Either path stores the same thing. `entry.data` holds the durable Clerk client
+credential, so `ClerkSessionProvider`, the API client and the coordinator are
+untouched.
 """
 
 from __future__ import annotations

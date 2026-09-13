@@ -1,10 +1,9 @@
 """Setup, the entities it creates, and what they do when data stops.
 
-The half that could not be tested before Home Assistant was installable here.
-Most of it is about ABSENCE: an entity that reads `unavailable` rather than a
+Most of this is about absence: an entity reading `unavailable` rather than a
 confident zero, a solar sensor that is not created at all, a state of charge
-that is legitimately unknown while on grid. Those are the decisions a wrong
-guess makes invisible, because a plausible number looks like a real one.
+legitimately unknown while on grid. A wrong guess there is invisible, because
+a plausible number looks like a real one.
 """
 
 from __future__ import annotations

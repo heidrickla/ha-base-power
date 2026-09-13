@@ -25,7 +25,7 @@
       },
       "manual": {
         "title": "Paste a credential",
-        "description": "Only needed if the emailed code does not work — for example an account that signs in with Google or Apple, or one with two-factor authentication. Sign in at https://account.basepowercompany.com/sign-in, then copy the value of the `__client` cookie for that site (DevTools → Application → Cookies). Use `__client`, not `__session`: the latter expires after about a minute.",
+        "description": "Only needed if the emailed code does not work: for example an account that signs in with Google or Apple, or one with two-factor authentication. Sign in at https://account.basepowercompany.com/sign-in, then copy the value of the `__client` cookie for that site (DevTools > Application > Cookies). Use `__client`, not `__session`: the latter expires after about a minute.",
         "data": {
           "client_jwt": "Clerk client credential (__client cookie)"
         }
@@ -37,7 +37,7 @@
     },
     "error": {
       "unknown_email": "No Base Power account was found for that email address.",
-      "invalid_code": "That code was not correct. Check the email and try again — the code is still valid.",
+      "invalid_code": "That code was not correct. Check the email and try again; the code is still valid.",
       "code_expired": "That code has expired or has been tried too many times. Start again to get a new one.",
       "too_many_requests": "Base Power is temporarily refusing sign-in attempts for this account. Wait a few minutes before trying again.",
       "signin_failed": "Sign-in could not be completed. If this account uses Google, Apple or two-factor authentication, go back and use the paste option instead.",
@@ -62,7 +62,7 @@
   "issues": {
     "telemetry_unavailable": {
       "title": "{name} is not sending data",
-      "description": "Base Power reports that your battery is not currently sending data, and Base's own app shows the same thing.\n\n**Your backup is not affected.** In a grid outage the battery will still power your home, even while it is not reporting.\n\n**Check the battery's Wi-Fi first.** Over Wi-Fi the battery reports about every 32 seconds. When Wi-Fi is unavailable it falls back to a cellular link that reports far less often, and Base drops a reading once it goes stale \u2014 which looks exactly like this. So repeated or long gaps usually mean the battery is on cellular. Check the access point it connects to; the one real occurrence of this was a power injector unplugged at the network end, which left the access point looking powered while carrying no traffic.\n\nWhat this means in Home Assistant: the battery's sensors show **unavailable**, and the battery state sensor reads *Telemetry unavailable*. That is deliberate. There is no current reading to show, and displaying the last known value \u2014 or a zero \u2014 would look like a real measurement of a house drawing no power.\n\n**Home Assistant cannot fix this.** The gap is between the battery and Base; the connection from Home Assistant to Base is working, which is how this was detected. If the Wi-Fi is fine and it does not clear on its own, contact Base Support.\n\nThis notice clears by itself as soon as the battery starts reporting again."
+      "description": "Your backup is not affected. In a grid outage the battery will still power your home, even while it is not reporting.\n\nBase Power reports that your battery is not currently sending data, and Base's own app shows the same thing.\n\nCheck the battery's Wi-Fi first. Over Wi-Fi it reports about every 32 seconds. On a cellular fallback it reports far less often, and Base drops a reading once it goes stale, which looks exactly like this. Repeated or long gaps usually mean the battery is on cellular. Check the access point it connects to: the one real occurrence was a power injector unplugged at the network end, leaving the access point looking powered while carrying no traffic.\n\nThe battery's sensors show unavailable and the battery state sensor reads Telemetry unavailable. That is deliberate. There is no current reading, and showing the last known value would look like a real measurement.\n\nHome Assistant cannot fix this. The gap is between the battery and Base. The connection from Home Assistant to Base is working, which is how this was detected. If the Wi-Fi is fine and it does not clear, contact Base Support.\n\nThis notice clears by itself as soon as the battery starts reporting again."
     }
   },
   "options": {

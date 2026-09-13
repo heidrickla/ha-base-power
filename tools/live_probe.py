@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """One read-only call against the live API, to test the recovered contract.
 
-Reads credentials from a file so no secret is ever pasted into a terminal or
-a transcript, and **never prints a token** - not even truncated. What it
-prints is the structure of the response, which is the thing under test.
+Reads credentials from a file so no secret is pasted into a terminal or a
+transcript, and never prints a token. It prints the structure of the response,
+which is the thing under test.
 
 The file is `key=value` lines:
 
@@ -15,12 +15,11 @@ way the app does, so the 60 s expiry stops mattering.
 
     python tools/live_probe.py path/to/creds.txt [--snapshot]
 
-Keep that file OUTSIDE the repo and delete it when you are done: `client` is
-the durable credential, so the file is as good as the account until it is.
+Keep that file outside the repo and delete it afterwards. `client` is the
+durable credential, so the file is as good as the account.
 
-Read-only by construction: it calls ListLocations, and GetSnapshot only with
---snapshot. It can reach no method that changes anything - StartManualBackup
-and ResetOvercurrent are not wired here on purpose.
+Read-only by construction: ListLocations, and GetSnapshot only with
+--snapshot. StartManualBackup and ResetOvercurrent are not wired here.
 """
 
 from __future__ import annotations

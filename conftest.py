@@ -1,20 +1,16 @@
 """Root pytest configuration.
 
-`tests/` and `tests/ha/` need different environments on purpose, and this is
-what lets one `pytest` command work in both:
+`tests/` and `tests/ha/` need different environments, and this lets one
+`pytest` command work in both.
 
-- `tests/` imports the parsing layer BY PATH and must run anywhere, including
-  a Windows host where Home Assistant cannot be installed at all. That is not
-  a limitation being worked around - it is the check. If a Home Assistant
-  import ever creeps into api.py or clerk.py, that suite stops running and
-  says so, which no amount of mocking would tell us.
-
+- `tests/` imports the parsing layer by path and runs anywhere, including a
+  Windows host where Home Assistant cannot be installed. That is the check:
+  if an HA import reaches api.py or clerk.py, that suite stops running.
 - `tests/ha/` needs a real Home Assistant, so it is skipped where there is
-  none rather than failing collection and taking the other suite down with it.
+  none rather than failing collection and taking the other suite with it.
 
-Running the full suite therefore needs Linux with
-pytest-homeassistant-custom-component installed; see the test-coverage entry
-in quality_scale.yaml for the exact versions.
+The full suite needs Linux with pytest-homeassistant-custom-component; the
+versions are in the test-coverage entry of quality_scale.yaml.
 """
 
 from __future__ import annotations

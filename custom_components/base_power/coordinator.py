@@ -1,8 +1,7 @@
 """Coordinator for the Base Power integration.
 
 Holds one battery snapshot per site and refreshes it on an interval. There is
-no push channel: the app polls, so this polls too - see DEFAULT_SCAN_INTERVAL
-in const.py for why it does not copy the app's 1 s rate.
+no push channel; the app polls too.
 """
 
 from __future__ import annotations
@@ -54,35 +53,26 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
             name=DOMAIN,
             config_entry=entry,
             update_interval=scan_interval,
-            # The snapshot is a small object that changes most polls, and
-            # entities derive from several of its fields, so comparing is not
-            # worth the equality machinery.
+            # Small object, changes most polls; comparing is not worth it.
             always_update=True,
         )
         self.address_id: str = entry.data[CONF_ADDRESS_ID]
         session = async_get_clientsession(hass)
         self._auth = ClerkSessionProvider(session, entry.data[CONF_CLIENT_JWT])
         self.client = BasePowerClient(session, self._auth.async_get_token)
-        # What the site declares it has. Read once at setup and used to
-        # decide which entities exist at all - a solar sensor on a site
-        # without solar would sit at unknown for ever and read as broken.
+        # Read once at setup; decides which entities exist at all.
         self.capabilities = LocationCapabilities()
-        # Whether the battery was last seen reporting. None until the first
-        # poll, so a battery that is already silent at startup still gets a
-        # line rather than being mistaken for a transition that never
-        # happened.
+        # None until the first poll, so a battery already silent at startup
+        # still gets a log line rather than looking like no transition.
         self._telemetry_available: bool | None = None
-        # Consecutive polls with no telemetry, so a blip does not raise a
-        # repair issue the user then has to dismiss.
         self._silent_polls = 0
 
     async def async_load_capabilities(self) -> None:
         """Ask the site what it has, before any entity is created.
 
-        A failure here is not fatal: the capabilities only widen or narrow
-        the entity set, and refusing to set the entry up because one extra
-        call failed would lose the battery sensors too. The default is the
-        conservative one - nothing declared.
+        A failure is not fatal: refusing to set the entry up because one extra
+        call failed would lose the battery sensors too. The default declares
+        nothing.
         """
         try:
             self.capabilities = await self.client.get_capabilities(self.address_id)
@@ -96,25 +86,21 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
     def _note_telemetry(self, snapshot: BatterySnapshot) -> None:
         """Track the battery falling silent: log it, and raise a repair issue.
 
-        Two different jobs. The log line exists because this is the condition
-        that takes almost every entity unavailable while the poll itself stays
-        perfectly healthy - DataUpdateCoordinator only speaks when a poll
-        FAILS, so without this the logs are silent exactly when the
-        integration looks broken. Once per transition, not per poll.
+        The log line matters because this condition takes almost every entity
+        unavailable while the poll itself stays healthy, and
+        DataUpdateCoordinator only speaks when a poll FAILS. Logged once per
+        transition, not per poll.
 
-        The repair issue is the user-facing half, and it deliberately waits:
-        a single quiet poll is not worth a notification, and at the default
-        interval raising and clearing on blips would produce two repairs a
-        minute. It clears the moment telemetry returns.
+        The repair issue waits out the grace period and clears the moment
+        telemetry returns.
         """
         available = snapshot.telemetry_available
 
         if available:
             self._silent_polls = 0
-            # Cleared unconditionally rather than only on an observed
-            # transition: if Home Assistant restarted while the battery was
-            # dark, this instance never saw the issue raised, but the issue
-            # is still sitting in the repairs list.
+            # Cleared unconditionally, not only on an observed transition: a
+            # restart while the battery was dark leaves the issue in the
+            # repairs list with this instance never having seen it raised.
             ir.async_delete_issue(self.hass, DOMAIN, ISSUE_TELEMETRY_UNAVAILABLE)
             if self._telemetry_available is False:
                 _LOGGER.info("The Base Power battery is reporting telemetry again")
@@ -124,40 +110,27 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
         self._silent_polls += 1
         if self._telemetry_available is not False:
             self._telemetry_available = False
-            # This message used to steer people AWAY from the Wi-Fi, on the
-            # grounds that the battery reports over cellular anyway. That was
-            # wrong, and it cost a day: Wi-Fi is the normal transport at ~32 s
-            # between reports, cellular is the fallback at minutes, and the
-            # one real occurrence of this condition was an access point with
-            # its PoE injector unplugged. The Wi-Fi IS the thing to check.
+            # The live wifi_status is not quoted: during a gap it reads
+            # UNAVAILABLE, as stale as everything else in a snapshot nobody
+            # sent, so it would say nothing. The diagnostic sensor is the
+            # useful surface once the link is back.
             #
-            # The live wifi_status is still not quoted, for a different and
-            # narrower reason: during a gap it reads UNAVAILABLE - the field
-            # is as stale as everything else in a snapshot nobody sent - so
-            # printing it would say nothing. The diagnostic sensor, which the
-            # user reads when the link is back, is the useful surface.
-            #
-            # Deliberately INFO, not WARNING. On a battery that has fallen
-            # back to cellular this fires between every report, so a warning
-            # per gap would be noise; the repair issue at 30 minutes is what
-            # escalates.
+            # INFO not WARNING: on cellular fallback this fires between every
+            # report. The repair issue at 30 minutes is what escalates.
             _LOGGER.info(
                 "The Base Power battery has no current telemetry (state %s). "
-                "The connection to Base is fine - this poll succeeded - so "
-                "the battery is either between reports or has stopped sending. "
-                "If this repeats, check the Wi-Fi access point the battery "
-                "associates with: on Wi-Fi it reports about every 32 seconds, "
-                "but it falls back to a cellular link that reports far less "
-                "often, and Base drops a snapshot once it goes stale. Entities "
-                "read unavailable rather than showing a stale value, and backup "
-                "during a grid outage is unaffected either way",
+                "This poll succeeded, so the battery is either between reports "
+                "or has stopped sending. If it repeats, check the Wi-Fi access "
+                "point it associates with: on Wi-Fi it reports about every 32 "
+                "seconds, on cellular fallback far less often. Entities read "
+                "unavailable rather than showing a stale value, and backup "
+                "during a grid outage is unaffected",
                 snapshot.state,
             )
 
         if self._silent_polls >= silent_polls_before_issue(self.update_interval):
-            # Re-created every poll once over the threshold, which is how the
-            # issue comes back by itself after a restart. async_create_issue
-            # is idempotent for the same id.
+            # Re-created every poll past the threshold, which is how it comes
+            # back after a restart. async_create_issue is idempotent per id.
             ir.async_create_issue(
                 self.hass,
                 DOMAIN,
@@ -176,17 +149,13 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
             self._note_telemetry(snapshot)
             return snapshot
         except BasePowerAuthError:
-            # The API refused the token. A minted token can simply have aged
-            # out mid-flight, so give the credential one chance to prove it
-            # is still good before sending the user to re-authenticate -
-            # asking someone to sign in again because a 60 s token expired
-            # two seconds early would be the wrong answer.
+            # A minted token can age out mid-flight, so give the credential one
+            # chance before sending the user to re-authenticate.
             try:
                 await self._auth.async_refresh()
                 snapshot = await self.client.get_snapshot(self.address_id)
-                # Same bookkeeping as the first-attempt path: a poll that only
-                # succeeded on the retry still observed the battery, and
-                # skipping it here would lose a transition.
+                # A poll that only succeeded on the retry still observed the
+                # battery; skipping this would lose a transition.
                 self._note_telemetry(snapshot)
                 return snapshot
             except (BasePowerAuthError, ClerkAuthError) as retry_err:

@@ -10,6 +10,8 @@ venv/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 
 # Base's application and anything derived straight from it. The repo holds the
 # RECOVERED CONTRACT - proto/ and docs/ - never the app itself.

@@ -1,11 +1,10 @@
 """Shape tests for the recovered contract.
 
-No network and no token: every response here is built to the field names in
-`proto/`, so these pin what the code does with the contract as recovered. They
-cannot prove the contract itself is right - nothing has been seen on the wire -
-and the cases that matter most are the ones where a wrong guess would be
-invisible: a missing power value reading as a confident 0.0, or an unfamiliar
-snapshot variant taking the integration down.
+No network and no token. Responses are built to the field names in `proto/`,
+plus fixtures captured from the live API. The cases that matter most are the
+ones where a wrong guess would be invisible: a missing power value reading as
+a confident 0.0, or an unfamiliar snapshot variant taking the integration
+down.
 """
 
 from __future__ import annotations

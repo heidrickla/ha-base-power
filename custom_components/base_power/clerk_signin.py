@@ -1,41 +1,21 @@
 """Passwordless sign-in against Clerk's frontend API.
 
-This exists so a user never has to paste a cookie out of a browser: they type
-their email, Clerk sends a code, they type the code, and what comes back is
-the durable client credential `ClerkSessionProvider` already knows how to use.
-`entry.data` keeps exactly the shape it had before - this is a new way to
-OBTAIN the credential, not a new credential model.
+The user types their email, Clerk sends a code, they type the code, and what
+comes back is the durable client credential `ClerkSessionProvider` uses. This
+is a way to obtain that credential, not a new credential model: `entry.data`
+keeps the shape it had before.
 
-**Native mode, not browser mode.** The app is a native Clerk client and the
-bundle carries `_is_native`, `__clerk_db_jwt` and the header `Clerk-Db-Jwt`.
-Native clients authenticate with `Authorization` and browser clients with
-`Origin` - and Clerk rejects a request carrying both, which is how that
-distinction was discovered. Native is the right side for a headless
-integration: no `Origin` to fake and no browser `User-Agent` to imitate.
+Native mode, not browser mode. Native clients authenticate with
+`Authorization`, browser clients with `Origin`, and Clerk rejects a request
+carrying both. Native suits a headless integration: no `Origin` to fake and no
+browser `User-Agent` to imitate.
 
-The flow, and every name in it read out of the app bundle rather than assumed
-(`signIn.create`, `prepareFirstFactor`, `attemptFirstFactor`, and the keys
-`identifier`, `strategy`, `emailAddressId`, `code`, `supportedFirstFactors`,
-`createdSessionId`):
+The endpoint sequence and every field name are in `docs/API.md`. The client
+credential arrives in the `Authorization` response header on every call, and
+the last one is stored.
 
-    POST /v1/client/sign_ins                    identifier=<email>
-      -> status needs_first_factor, supported_first_factors[]
-    POST /v1/client/sign_ins/<id>/prepare_first_factor
-                                                strategy=email_code
-                                                email_address_id=<from above>
-      -> Clerk emails a code
-    POST /v1/client/sign_ins/<id>/attempt_first_factor
-                                                strategy=email_code, code=<typed>
-      -> status complete, created_session_id
-
-The client credential is returned in the `Authorization` RESPONSE header on
-every call, and the final one is what gets stored.
-
-**Not exercised against the live service.** Requesting a code sends a real
-email to a real person, so this is built from the bundle and covered by tests
-with faked responses; the first real run is the first test of it. What it is
-built on - the endpoint paths, the field names, the statuses and the native
-mode - is evidence, not guesswork.
+Confirmed live: a real user completed this flow. Requesting a code emails a
+real person, so the tests use faked responses.
 """
 
 from __future__ import annotations
@@ -115,10 +95,9 @@ class ClerkSignIn:
     ) -> tuple[dict[str, Any], str | None]:
         """POST form-encoded, returning the body and any refreshed credential.
 
-        Clerk hands the native client credential back in the `Authorization`
-        response header on every call, so it is read here rather than at the
-        end - the value can rotate mid-flow and the last one is the one worth
-        keeping.
+        Clerk returns the credential in the `Authorization` response header on
+        every call, and it can rotate mid-flow, so it is read here rather than
+        at the end.
         """
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         if client_jwt:
@@ -191,13 +170,10 @@ class ClerkSignIn:
 def _credential_from(headers: Any) -> str | None:
     """The client credential out of a Clerk response, from either header.
 
-    `Authorization` is the documented native-mode carrier and the one this
-    was built against. `Clerk-Db-Jwt` is checked as well because the app
-    bundle carries that exact header name alongside `__clerk_db_jwt`, so it
-    is a real alternative rather than a guess - and which one a given Clerk
-    version uses is the single biggest inference in this module. Accepting
-    both costs nothing and removes a whole failure mode from the first real
-    sign-in.
+    `Authorization` is the native-mode carrier this was built against.
+    `Clerk-Db-Jwt` is checked too because the bundle carries that header name
+    alongside `__clerk_db_jwt`. Which one a given Clerk version uses is the
+    largest inference in this module, and accepting both costs nothing.
     """
     for name in ("Authorization", "Clerk-Db-Jwt"):
         raw = headers.get(name)
@@ -225,8 +201,8 @@ def _error_for(body: Any, status: int) -> ClerkSignInError:
     """Map Clerk's error codes to something the user can act on.
 
     Clerk reports `{"errors": [{"code": ..., "message": ...}]}`. The codes
-    matter more than the status: a wrong code and an expired one are both
-    422, and they need different answers - retype it, versus start again.
+    matter more than the status: a wrong code and an expired one are both 422
+    and need different answers, retype versus start again.
     """
     code = ""
     message = ""
