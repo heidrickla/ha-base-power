@@ -44,9 +44,18 @@ The app authenticates with **Clerk**, not with a Base-issued credential:
 - account portal: `https://account.basepowercompany.com/`
 - the app reads the token via Clerk's `useAuth()` and attaches it per request
 
-**Not yet established:** exactly which Clerk flow yields a long-lived token
-usable by a headless integration, and how it is refreshed. That is the first
-open question and it needs a real sign-in to answer.
+**No custom JWT template is used.** Clerk's `getToken()` accepts
+`{ template, leewayInSeconds, skipCache }`, and the only occurrences of
+`template` in the bundle are that generic options object and Expo's icon
+`renderingMode: 'template'` — no template name is ever passed. So the API
+accepts a **plain Clerk session token** (`__session`), which is the simplest
+case for a headless client.
+
+**Not yet established:** which Clerk sign-in flow a headless integration
+should use to obtain that session, and how to refresh it before expiry (Clerk
+session JWTs are short-lived, typically ~60 s, and are refreshed against the
+frontend API). That is the first open question and it needs a real sign-in to
+answer.
 
 ## Services and methods
 
