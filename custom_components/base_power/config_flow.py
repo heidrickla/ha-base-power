@@ -51,6 +51,10 @@ from .coordinator import BasePowerConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
+# Hassfest rejects a URL inside a translation string and points at description
+# placeholders instead, so the sign-in address is supplied as one.
+SIGN_IN_URL = "https://account.basepowercompany.com/sign-in"
+
 STEP_EMAIL = vol.Schema({vol.Required(CONF_EMAIL): str})
 STEP_CODE = vol.Schema({vol.Required("code"): str})
 STEP_MANUAL = vol.Schema({vol.Required(CONF_CLIENT_JWT): str})
@@ -155,7 +159,12 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             if result is not None:
                 return result
-        return self.async_show_form(step_id="manual", data_schema=STEP_MANUAL, errors=errors)
+        return self.async_show_form(
+            step_id="manual",
+            data_schema=STEP_MANUAL,
+            errors=errors,
+            description_placeholders={"url": SIGN_IN_URL},
+        )
 
     # ------------------------------------------------------------ shared
 

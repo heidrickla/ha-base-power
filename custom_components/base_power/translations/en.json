@@ -25,7 +25,7 @@
       },
       "manual": {
         "title": "Paste a credential",
-        "description": "Only needed if the emailed code does not work: for example an account that signs in with Google or Apple, or one with two-factor authentication. Sign in at https://account.basepowercompany.com/sign-in, then copy the value of the `__client` cookie for that site (DevTools > Application > Cookies). Use `__client`, not `__session`: the latter expires after about a minute.",
+        "description": "Only needed if the emailed code does not work: for example an account that signs in with Google or Apple, or one with two-factor authentication. Sign in at {url}, then copy the value of the `__client` cookie for that site (DevTools > Application > Cookies). Use `__client`, not `__session`: the latter expires after about a minute.",
         "data": {
           "client_jwt": "Clerk client credential (__client cookie)"
         }
