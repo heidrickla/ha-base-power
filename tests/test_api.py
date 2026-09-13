@@ -135,6 +135,62 @@ def test_wifi_rides_alongside_the_variant():
     assert s.wifi_status == "CONNECTED"
 
 
+# ------------------------------------------------- the live response, confirmed
+
+# Captured from the real API on 2026-09-13 (GetSnapshot, on-grid, no solar).
+# Field names and shapes are verbatim; the wifi SSID and the address are not
+# reproduced because they are not needed to pin the contract.
+LIVE_ON_GRID = {
+    "snapshot": {
+        "wifi": {"status": "BATTERY_WIFI_CONNECTION_STATUS_CONNECTED", "observedAt": "2026-09-13T02:41:09.000Z"},
+        "onGrid": {
+            "observedAt": "2026-09-13T02:41:09.000Z",
+            "powerFlow": {
+                "fromGridKw": 2.9,
+                "fromStorageKw": -0.3,
+                "nonSolarToHomeKw": 2.6,
+                "toHomeKw": 2.6,
+            },
+            "estimatedBackupHoursAtCurrentUsage": 17.227362471449034,
+            "estimatedBackupHoursAt750Watts": 59.333333333333336,
+        },
+    }
+}
+
+
+def test_the_real_on_grid_response_parses():
+    s = BatterySnapshot.from_json(LIVE_ON_GRID)
+    assert s.state == "on_grid"
+    assert s.is_grid_outage is False
+    assert s.telemetry_available is True
+    assert s.power_flow.from_grid_kw == 2.9
+    assert s.power_flow.to_home_kw == 2.6
+    assert s.estimated_backup_hours_at_current_usage == pytest.approx(17.2273624)
+    assert s.estimated_backup_hours_at_750_watts == pytest.approx(59.3333333)
+    assert s.wifi_status == "BATTERY_WIFI_CONNECTION_STATUS_CONNECTED"
+
+
+def test_on_grid_really_does_omit_state_of_charge():
+    """Confirmed against the live API, not just the descriptor: there is no
+    stateOfEnergyPercent while on grid. A state-of-charge sensor therefore
+    cannot be fed from GetSnapshot in the normal case, which is a design
+    constraint rather than a bug to code around."""
+    assert BatterySnapshot.from_json(LIVE_ON_GRID).state_of_energy_percent is None
+
+
+def test_a_negative_from_storage_means_charging():
+    """The live reading was -0.3 kW: sign carries direction. It must survive
+    parsing rather than being clamped, because charging and discharging are
+    the same sensor in Home Assistant."""
+    assert BatterySnapshot.from_json(LIVE_ON_GRID).power_flow.from_storage_kw == -0.3
+
+
+def test_absent_solar_is_none_in_the_real_response():
+    """The live response omitted fromSolarKw entirely on a site with no
+    solar. Reporting 0.0 there would be a measurement nobody made."""
+    assert BatterySnapshot.from_json(LIVE_ON_GRID).power_flow.from_solar_kw is None
+
+
 # ------------------------------------------------------------------ power flow
 
 

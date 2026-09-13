@@ -1,9 +1,41 @@
 # The Base Power mobile API, as recovered from the app
 
-Everything here is read out of the shipped Android app, not from documentation
-and not from observed traffic. Where something is a reading rather than a
-measurement it says so, because none of it has been exercised against the live
-service yet.
+Everything here was read out of the shipped Android app, not from
+documentation. **The transport, the auth flow, `LocationsService/ListLocations`
+and `BatteryService/GetSnapshot` have since been confirmed against the live
+service** (2026-09-13, read-only, `tools/live_probe.py`). Anything not marked
+confirmed is still a reading of the binary rather than a measurement, and says
+so.
+
+## Confirmed live, 2026-09-13
+
+- Clerk minting works: browser `__client` → `GET /v1/client` → active session
+  → `POST /v1/client/sessions/<sid>/tokens` → a fresh session JWT.
+- `ListLocations` → 200, one location: `addressId`, `address` (line1, city,
+  state, postalCode, country, timezone), `status`.
+- `GetSnapshot` → 200, `onGrid` variant, with `powerFlow`
+  (`fromGridKw` 2.9, `fromStorageKw` **-0.3**, `nonSolarToHomeKw` 2.6,
+  `toHomeKw` 2.6), `estimatedBackupHoursAtCurrentUsage`,
+  `estimatedBackupHoursAt750Watts`, and a `wifi` block.
+
+Three findings that change the integration design:
+
+1. **`onGrid` carries no `stateOfEnergyPercent`.** The descriptor implied it
+   and the live response confirms it: state of charge is simply not published
+   while the battery is on grid, only in the off-grid variants. A SoC sensor
+   cannot be fed from `GetSnapshot` in the normal case.
+   `estimatedBackupHoursAt750Watts` is the usable proxy for stored energy
+   (59.33 h × 0.75 kW ≈ 44.5 kWh available at the time of the call).
+2. **`fromStorageKw` is signed** — the live value was `-0.3`, the battery
+   charging from grid. Direction is in the sign, so it must not be clamped.
+3. **Absent fields are absent, not zero.** The site has no solar and
+   `fromSolarKw` was omitted entirely rather than sent as `0.0`.
+
+Three things Clerk's frontend API requires, each learned by being refused:
+the path is `GET /v1/client` (not `/v1/client/sync`); `Origin` and the
+API-version query params must be present; and `Origin` and `Authorization`
+must never both be sent. A **browser `User-Agent` is also required** — the
+identical request is refused `403` as `Python-urllib`.
 
 Recovered from **Base Power `1.14.0` (versionCode 87)**, package
 `com.basepowercompany.basemobileapp`, pulled from a Pixel over ADB on

@@ -18,20 +18,25 @@ The app is React Native on Hermes and talks **Connect RPC** to
 
 ## Status
 
-**Nothing has been called against the live service yet.** Every statement in
-`docs/API.md` is read out of the app binary, not measured on the wire. The
-integration does not exist yet; this repo currently holds the contract it will
+**The contract is confirmed live** (2026-09-13, read-only): auth, `ListLocations`
+and `GetSnapshot` all answered. Statements in
+`docs/API.md` still marked unconfirmed remain readings of the app binary. The
+integration itself does not exist yet; this repo holds the contract it will
 be written against.
 
-The one thing blocking a first request is Clerk token acquisition for a
-headless client — see the open questions at the end of `docs/API.md`.
+Sign-in is passwordless (emailed code or Google/Apple) at
+https://account.basepowercompany.com/sign-in — see `docs/API.md`.
 
 ## Intended entities
 
 From `BatteryService/GetSnapshot` plus `UsageService`:
 
-- state of charge, power flow (grid / storage / solar / home), estimated
-  backup hours, grid voltage
+- power flow (grid / storage / solar / home) — `fromStorageKw` is signed, so
+  one sensor covers charge and discharge
+- estimated backup hours, and stored energy derived from the 750 W figure
+- grid voltage from `UsageService`
+- **not** state of charge in the normal case: the live `onGrid` response
+  carries no `stateOfEnergyPercent`, only the off-grid variants do
 - a grid-outage binary sensor, which is the reason most people would install
   this
 - daily energy to home, solar to home and solar export, for the energy

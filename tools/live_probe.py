@@ -30,6 +30,12 @@ import urllib.request
 
 API_HOST = "https://dashboard.baseapis.net"
 CLERK_HOST = "https://clerk.basepowercompany.com"
+PORTAL = "https://account.basepowercompany.com"
+CLERK_PARAMS = "__clerk_api_version=2025-04-10&_clerk_js_version=5.40.0"
+BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+)
 PACKAGE = "dashboard.mobile.v2"
 READ_ONLY = {("LocationsService", "ListLocations"), ("BatteryService", "GetSnapshot")}
 
@@ -46,8 +52,16 @@ def load_creds(path: str) -> dict[str, str]:
     return {k: v for k, v in creds.items() if v}
 
 
+def get(url: str, headers: dict[str, str]) -> tuple[int, object]:
+    return _request(urllib.request.Request(url, headers=headers, method="GET"))
+
+
 def post(url: str, body: bytes | None, headers: dict[str, str]) -> tuple[int, object]:
     req = urllib.request.Request(url, data=body if body is not None else b"", headers=headers)
+    return _request(req)
+
+
+def _request(req: urllib.request.Request) -> tuple[int, object]:
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             raw = resp.read()
@@ -65,14 +79,34 @@ def post(url: str, body: bytes | None, headers: dict[str, str]) -> tuple[int, ob
 def mint_session_token(client_jwt: str) -> str | None:
     """Swap the durable client credential for a fresh session JWT.
 
-    This is the mechanism the integration will use per poll. Clerk's client
-    endpoint reports the sessions this client owns; the active one mints a
-    token at /tokens.
+    This is the mechanism the integration will use per poll: the client
+    endpoint reports the sessions this client owns, and the active one mints
+    a token at /tokens.
+
+    Three things Clerk's frontend API requires, each learned by being refused
+    without it:
+
+    - the path is `GET /v1/client`, not `/v1/client/sync`
+    - `Origin` must be set (a browser client is bound to its origin), and
+      the API-version query params must be present
+    - `Origin` and `Authorization` must NEVER both be sent - Clerk rejects
+      that outright as a security measure, so a cookie client uses Origin
+      and a native client uses Authorization, never both
     """
-    headers = {"Cookie": f"__client={client_jwt}", "Content-Type": "application/json"}
-    status, body = post(f"{CLERK_HOST}/v1/client/sync", b"", headers)
+    # A browser User-Agent is required, not cosmetic: the identical request
+    # succeeds under curl and is refused 403 as Python-urllib. The cookie
+    # credential belongs to a browser client bound to this origin, so the
+    # request has to look like what that client is.
+    headers = {
+        "Cookie": f"__client={client_jwt}",
+        "Origin": PORTAL,
+        "Referer": f"{PORTAL}/",
+        "Content-Type": "application/json",
+        "User-Agent": BROWSER_UA,
+    }
+    status, body = get(f"{CLERK_HOST}/v1/client?{CLERK_PARAMS}", headers)
     if status != 200 or not isinstance(body, dict):
-        print(f"  client sync -> HTTP {status} (cannot mint; falling back to session=)")
+        print(f"  GET /v1/client -> HTTP {status} (cannot mint; falling back to session=)")
         return None
     response = body.get("response") or body
     sessions = response.get("sessions") or []
@@ -80,10 +114,12 @@ def mint_session_token(client_jwt: str) -> str | None:
         sessions[0] if sessions else None
     )
     if not active:
-        print("  client sync ok but no session on this client")
+        print("  /v1/client ok but no session on this client")
         return None
     sid = active.get("id")
-    status, body = post(f"{CLERK_HOST}/v1/client/sessions/{sid}/tokens", b"", headers)
+    status, body = post(
+        f"{CLERK_HOST}/v1/client/sessions/{sid}/tokens?{CLERK_PARAMS}", b"", headers
+    )
     if status == 200 and isinstance(body, dict) and body.get("jwt"):
         print(f"  minted a fresh session token from the client credential (session {sid[:8]}...)")
         return str(body["jwt"])
