@@ -176,12 +176,17 @@ rules:
   test-coverage:
     status: todo
     comment: |
-      68 tests cover the pure layer - the snapshot state union, the power
+      89 tests cover the pure layer - the snapshot state union, the power
       flow's None-vs-zero distinction, capability parsing, the repair
-      threshold, error mapping, diagnostics redaction and the Clerk sign-in
-      state machine - including fixtures captured from the live API, and
-      nested objects arriving as the wrong type. The HA layer itself has NO
-      tests, which is what keeps this todo.
+      threshold, error mapping, diagnostics redaction, the Clerk sign-in
+      state machine and the session-token provider - including fixtures
+      captured from the live API, and nested objects arriving as the wrong
+      type. The HA layer itself has NO tests, which is what keeps this todo.
+
+      The session provider (clerk.py) had none at all until the strict-typing
+      pass found a crash in it, which is worth recording as a pattern: the
+      module with no tests was the module on the auth hot path, and nothing
+      flagged that until a type checker was pointed at it.
 
       It is however now PROVEN TO LOAD AND TO READ CORRECTLY on real data.
       A real entry on Home Assistant 2026.9.2 reached state=loaded with all

@@ -2,8 +2,24 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Tool caches. Each of these writes its own self-ignoring .gitignore, so they
+# stay out of `git status` without this - but that is the tool's choice, not
+# the repo's, and a tool that stops doing it would silently start offering 40
+# files to the next `git add`.
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Base's application and anything derived straight from it. The repo holds the
+# RECOVERED CONTRACT - proto/ and docs/ - never the app itself.
 *.apk
 apks/
 bundle.hasm
 hbc-parse.txt
 strings.*.txt
+
+# Credentials for tools/live_probe.py. `client` is the durable one, so a file
+# holding it is as good as the account.
+creds.txt
+*session*.txt

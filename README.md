@@ -245,3 +245,14 @@ This is interoperability work on hardware the owner owns, for their own data.
 It reads the app that is already installed on the owner's phone. It is not a
 licence to hammer Base's service: poll conservatively, and treat the two
 control methods as what they are — commands to a live battery.
+
+Not affiliated with, endorsed by, or supported by Base Power. "Base Power" is
+their name, not a claim on it. Base can change or withdraw this API at any
+time without notice, and nothing here is a promise that it keeps working.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). That covers the code in this repository. It does
+not cover Base's application, which is theirs and is not redistributed here:
+what this repo holds is the *derived contract*, recorded in `proto/` and
+`docs/`.
