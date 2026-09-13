@@ -24,8 +24,28 @@ and `GetSnapshot` all answered. Statements in
 integration itself does not exist yet; this repo holds the contract it will
 be written against.
 
-Sign-in is passwordless (emailed code or Google/Apple) at
-https://account.basepowercompany.com/sign-in — see `docs/API.md`.
+## Setting it up
+
+Base Power has no password — Clerk emails a six-digit code — so the config
+flow does that for you:
+
+1. Add the integration and choose **Sign in with an emailed code**.
+2. Enter the email address on your Base account.
+3. Enter the code they send.
+
+That is all. Home Assistant keeps the durable credential Clerk returns and
+mints short-lived tokens from it as needed, the same way the mobile app does.
+
+There is a second menu option, **paste a credential**, for the cases the code
+route cannot cover: an account that signs in only with Google or Apple, an
+account with two-factor authentication, or a change at Clerk that breaks the
+code flow. It takes the `__client` cookie from a browser session — see
+`docs/API.md`.
+
+**Neither path has been run against the live service yet.** Requesting a code
+emails a real person, so the sign-in is built from the app's own protocol and
+covered by tests with faked responses; the first real setup is the first test
+of it.
 
 ## Intended entities
 

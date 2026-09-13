@@ -119,10 +119,47 @@ Connect endpoint refusing a request with no usable content type.
 accepts a **plain Clerk session token** (`__session`), which is the simplest
 case for a headless client.
 
-**Established 2026-09-13, and implemented in `clerk.py`:** the user signs in
-once at the hosted portal and hands the integration the durable `__client`
-cookie; the integration then mints session JWTs itself, caching each until it
-is close to expiry. Refresh needs no further interaction.
+**Established 2026-09-13, and implemented in `clerk.py` and
+`clerk_signin.py`:** the integration signs in itself with an emailed code and
+keeps the durable client credential, then mints session JWTs from it, caching
+each until close to expiry. Refresh needs no further interaction, and the
+user never opens developer tools.
+
+### The sign-in, as the app performs it
+
+Every name below is a string the app bundle carries - the SDK methods
+(`signIn.create`, `prepareFirstFactor`, `attemptFirstFactor`), the fields
+(`identifier`, `strategy`, `emailAddressId`, `code`, `supportedFirstFactors`,
+`createdSessionId`) and the statuses (`needs_first_factor`,
+`needs_second_factor`, `complete`).
+
+```
+POST /v1/client/sign_ins                              identifier=<email>
+  -> status needs_first_factor, supported_first_factors[]
+POST /v1/client/sign_ins/<id>/prepare_first_factor    strategy=email_code
+                                                      email_address_id=<from above>
+  -> Clerk emails a six-digit code
+POST /v1/client/sign_ins/<id>/attempt_first_factor    strategy=email_code
+                                                      code=<typed>
+  -> status complete, created_session_id
+```
+
+**Native mode, not browser mode.** All of the above carries
+`?_is_native=1` and authenticates with `Authorization`, never `Origin` -
+Clerk rejects a request sending both, which is how the two modes were told
+apart. The bundle's `_is_native`, `__clerk_db_jwt` and `Clerk-Db-Jwt` are
+what identify the app as a native client. This is the better side for a
+headless integration: the browser flow additionally needs an `Origin` and a
+browser `User-Agent` (a request identical but for the UA is refused `403` as
+`Python-urllib`), and native needs neither.
+
+The client credential comes back in the `Authorization` **response** header
+on each call, and can rotate mid-flow, so the last one is the one to keep.
+
+**Not exercised live.** Requesting a code emails a real person. The two
+inferences most worth checking on the first real run are the exact error
+codes Clerk returns for a wrong versus an expired code, and whether the
+credential really arrives in that response header every time.
 
 What remains open is only how long a `__client` lasts before Clerk ends the
 session and the user has to sign in again — unknown, so the integration

@@ -42,11 +42,12 @@ rules:
   config-flow:
     status: done
     comment: |
-      A single-step flow taking the Clerk client credential, which is
-      validated by a real ListLocations call before the entry is created; the
-      site is discovered from that response rather than typed. Sign-in itself
-      is passwordless (emailed code or social), so there is no username and
-      password to collect.
+      A menu, then email, then code: the integration performs Clerk's
+      passwordless sign-in itself rather than asking anyone to copy a cookie.
+      The credential is validated by a real ListLocations call before the
+      entry is created, and the site is discovered from that response rather
+      than typed. A pasted credential remains as a demoted second option for
+      social-only and two-factor accounts.
   dependency-transparency:
     status: done
     comment: |
@@ -63,11 +64,11 @@ rules:
     status: done
     comment: README.md says what it is and what it talks to.
   docs-installation-instructions:
-    status: todo
+    status: done
     comment: |
-      README covers what the integration is, not yet how to install it. The
-      credential-copying step in particular needs writing up for someone who
-      has not read docs/API.md.
+      README has a Setting it up section: add the integration, choose the
+      emailed code, enter the address, enter the code. The fallback paste
+      path is described as a fallback and says when it is needed.
   docs-removal-instructions:
     status: todo
   docs-triggers:
@@ -140,16 +141,21 @@ rules:
     status: done
     comment: |
       A Clerk session can end or be revoked, which is the expected way this
-      breaks, so async_step_reauth takes a fresh credential and validates it
-      before storing.
+      breaks. Reauth re-runs the same emailed-code sign-in, pre-filled from
+      the address stored in entry.data, and falls back to asking for the
+      address when an older entry has none. The new credential is validated
+      before it replaces the stored one.
   test-coverage:
     status: todo
     comment: |
-      41 tests cover the pure layer - the snapshot state union, the power
-      flow's None-vs-zero distinction, capability parsing, error mapping and
-      diagnostics redaction - including fixtures captured from the live API.
-      The HA layer has NO tests and has never been imported by a running
-      Home Assistant. That is the honest state.
+      50 tests cover the pure layer - the snapshot state union, the power
+      flow's None-vs-zero distinction, capability parsing, error mapping,
+      diagnostics redaction and the Clerk sign-in state machine - including
+      fixtures captured from the live API. The HA layer itself has NO tests.
+      It is now known to IMPORT under Home Assistant 2026.9.2 (verified by
+      ha-management-02 on the live instance, config flow rendered over the
+      REST API), but the entity platforms have still never been imported,
+      because that needs an entry to actually set up.
 
   # Gold
   devices:
