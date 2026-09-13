@@ -37,7 +37,12 @@ BROWSER_UA = (
     "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 )
 PACKAGE = "dashboard.mobile.v2"
-READ_ONLY = {("LocationsService", "ListLocations"), ("BatteryService", "GetSnapshot")}
+READ_ONLY = {
+    ("LocationsService", "ListLocations"),
+    ("BatteryService", "GetSnapshot"),
+    ("UsageService", "GetRecentPower"),
+    ("UsageService", "GetRecentGridVoltage"),
+}
 
 
 def load_creds(path: str) -> dict[str, str]:
@@ -167,6 +172,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("creds")
     ap.add_argument("--snapshot", action="store_true", help="also call BatteryService/GetSnapshot")
+    ap.add_argument("--usage", action="store_true", help="also call the read-only UsageService methods")
     a = ap.parse_args()
 
     creds = load_creds(a.creds)
@@ -197,6 +203,13 @@ def main() -> None:
         if aid:
             address_ids.append(aid)
     print(f"\naddress_id(s) found: {len(address_ids)}")
+
+    if a.usage and address_ids:
+        for method in ("GetRecentPower", "GetRecentGridVoltage"):
+            print(f"\n=== UsageService/{method} ===")
+            status, body = call("UsageService", method, {"addressId": address_ids[0]}, token)
+            print(f"HTTP {status}")
+            print(redact(body) if status == 200 else f"body: {body}")
 
     if a.snapshot and address_ids:
         print("\n=== BatteryService/GetSnapshot ===")

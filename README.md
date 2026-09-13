@@ -34,7 +34,9 @@ From `BatteryService/GetSnapshot` plus `UsageService`:
 - power flow (grid / storage / solar / home) — `fromStorageKw` is signed, so
   one sensor covers charge and discharge
 - estimated backup hours, and stored energy derived from the 750 W figure
-- grid voltage from `UsageService`
+- **not** grid voltage or recent-power history yet: `UsageService` answers
+  200 with no samples for this site, so a sensor there would sit at `unknown`
+  for ever (see `docs/API.md`)
 - **not** state of charge in the normal case: the live `onGrid` response
   carries no `stateOfEnergyPercent`, only the off-grid variants do
 - a grid-outage binary sensor, which is the reason most people would install

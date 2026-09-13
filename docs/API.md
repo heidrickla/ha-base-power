@@ -18,7 +18,17 @@ so.
   `toHomeKw` 2.6), `estimatedBackupHoursAtCurrentUsage`,
   `estimatedBackupHoursAt750Watts`, and a `wifi` block.
 
-Three findings that change the integration design:
+**`UsageService` returns no samples for this site.** `GetRecentPower` and
+`GetRecentGridVoltage` both answer `200` with an empty body. proto3 JSON omits
+empty repeated fields, so `{}` means `samples` is empty rather than the call
+having failed - the methods exist and are authorised, they just have nothing
+to give. Why is not yet known: it may need a metering capability this site
+does not have, a time window the request does not carry, or simply history
+that has not accumulated. **Until that is understood, no sensor should be
+built on them**, because it would sit at `unknown` for ever and look broken.
+`GetDailyEnergy` takes a service period and has not been called at all.
+
+Four findings that change the integration design:
 
 1. **`onGrid` carries no `stateOfEnergyPercent`.** The descriptor implied it
    and the live response confirms it: state of charge is simply not published
@@ -193,7 +203,7 @@ Directly mappable, from `GetSnapshot` polled on an interval:
   (`device_class: problem`), which is the headline entity
 - **sensor**: battery state — which snapshot variant is set
 - **sensor**: grid voltage from `GetRecentGridVoltage`
-- **energy dashboard**: `GetDailyEnergy` gives kWh to home, solar to home and
+- **energy dashboard**: `GetDailyEnergy` would give kWh to home, solar to home and
   solar export, with cost — the right shape for statistics
 - **button**: `StartManualBackup`, `ResetOvercurrent` (both mutations, both
   affect real hardware — worth a confirm-style helper rather than a bare
