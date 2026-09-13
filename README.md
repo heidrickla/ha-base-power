@@ -113,6 +113,26 @@ Holding the last value through either would show a stale number as current.
 The **Battery state** sensor is the deliberate exception: it stays available to
 say *why* the others went away.
 
+### Expect gaps, especially on a cellular battery
+
+**The battery has its own reporting cadence, separate from this poll
+interval**, and Home Assistant cannot speed it up. The unit reports to Base
+over Wi-Fi or over a cellular link, and on cellular it reports infrequently —
+Base then drops the snapshot once it goes stale rather than serving an old
+one. Measured on a perfectly healthy battery: a snapshot already five minutes
+old, and no current telemetry about ten minutes after its last report.
+
+So **entities dropping to unavailable for a few minutes at a time is normal**
+on a cellular-connected site — not a fault, and not something to fix. Polling
+faster does not help; it only asks more often for data the battery has not
+sent. If the gaps bother you, an automation or a template sensor can hold the
+last value. This integration deliberately will not, because a stale kW figure
+is indistinguishable from a real one.
+
+A repair notice appears only after **30 minutes** without telemetry — well
+clear of a normal reporting gap, and short enough to catch a battery that has
+genuinely stopped.
+
 ## Configuration
 
 One option, under the integration's **Configure** button:
@@ -169,7 +189,8 @@ Entity ids follow your site's device name, so adjust them to match.
 |---|---|
 | **State of charge is `unknown`** | Expected while on grid. Base only publishes it off grid. Use **Stored energy** instead. |
 | **No solar sensor** | The site does not declare solar. Base omits the field, so the sensor is not created rather than reading a false zero. |
-| **Everything is unavailable, but the integration looks fine** | Either the poll is failing, or Base answered `telemetry_unavailable`. Check **Battery state** — it stays available and says which. If it reads `telemetry_unavailable`, the integration is working and **the battery is not reporting to Base** — Base's own app shows the same banner. Home Assistant raises a repair notice after five minutes explaining it. Your backup is unaffected: the battery still powers the house in an outage while dark. Contact Base Support if it does not clear. Note the battery does **not** report over Wi-Fi, so the Wi-Fi sensor is not the thing to chase (see `docs/API.md`). |
+| **Entities go unavailable for a few minutes, repeatedly** | Normal on a cellular-connected battery — see *Expect gaps* above. It reports infrequently and Base drops the snapshot once it is stale. Nothing to fix, and polling faster will not help. |
+| **Everything is unavailable, but the integration looks fine** | Either the poll is failing, or Base answered `telemetry_unavailable`. Check **Battery state** — it stays available and says which. If it reads `telemetry_unavailable`, the integration is working and Base has no current reading from the battery; Base's own app shows the same banner. A repair notice appears after **30 minutes**, long enough to rule out an ordinary reporting gap. Your backup is unaffected: the battery still powers the house in an outage while it is not reporting. Contact Base Support if it does not clear. The battery does **not** report over Wi-Fi, so the Wi-Fi sensor is not the thing to chase (see `docs/API.md`). |
 | **Asked to sign in again** | A Base session ended or was revoked. Reauthentication re-sends a code to the stored address. |
 | **"Base Power is temporarily refusing sign-in attempts"** | Clerk rate-limiting. Wait a few minutes; retrying immediately makes it worse. |
 | **Sign-in fails and mentions Google, Apple or two-factor** | The emailed-code route cannot complete those. Use the paste option in the setup menu. |

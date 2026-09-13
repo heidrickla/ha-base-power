@@ -59,3 +59,19 @@ ISSUE_TELEMETRY_UNAVAILABLE = "telemetry_unavailable"
 # rare enough to mean something.
 TELEMETRY_GRACE = timedelta(minutes=30)
 MIN_TELEMETRY_POLLS = 2
+
+
+def silent_polls_before_issue(interval: timedelta | None) -> int:
+    """How many quiet polls the grace period is worth at a given interval.
+
+    Module-level and pure so it can be tested without Home Assistant. That is
+    not incidental: this is the number that was wrong once already, and a
+    threshold nobody can exercise is one nobody notices drifting.
+
+    The floor matters at the long end. At an hourly interval two polls is two
+    hours rather than thirty minutes - correct, because a thirty-minute
+    condition simply is not detectable from hourly samples, and pretending
+    otherwise would raise the issue off a single reading.
+    """
+    seconds = (interval or DEFAULT_SCAN_INTERVAL).total_seconds()
+    return max(MIN_TELEMETRY_POLLS, round(TELEMETRY_GRACE.total_seconds() / seconds))

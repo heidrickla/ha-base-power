@@ -31,8 +31,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     ISSUE_TELEMETRY_UNAVAILABLE,
-    MIN_TELEMETRY_POLLS,
-    TELEMETRY_GRACE,
+    silent_polls_before_issue,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -94,16 +93,6 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
                 err,
             )
 
-    @property
-    def _silent_polls_before_issue(self) -> int:
-        """How many quiet polls the grace period is worth at this interval."""
-        seconds = (
-            self.update_interval.total_seconds()
-            if self.update_interval
-            else DEFAULT_SCAN_INTERVAL.total_seconds()
-        )
-        return max(MIN_TELEMETRY_POLLS, round(TELEMETRY_GRACE.total_seconds() / seconds))
-
     def _note_telemetry(self, snapshot: BatterySnapshot) -> None:
         """Track the battery falling silent: log it, and raise a repair issue.
 
@@ -156,7 +145,7 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
                 snapshot.state,
             )
 
-        if self._silent_polls >= self._silent_polls_before_issue:
+        if self._silent_polls >= silent_polls_before_issue(self.update_interval):
             # Re-created every poll once over the threshold, which is how the
             # issue comes back by itself after a restart. async_create_issue
             # is idempotent for the same id.
