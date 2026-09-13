@@ -176,11 +176,12 @@ rules:
   test-coverage:
     status: todo
     comment: |
-      53 tests cover the pure layer - the snapshot state union, the power
-      flow's None-vs-zero distinction, capability parsing, error mapping,
-      diagnostics redaction and the Clerk sign-in state machine - including
-      fixtures captured from the live API. The HA layer itself has NO tests,
-      which is what keeps this todo.
+      68 tests cover the pure layer - the snapshot state union, the power
+      flow's None-vs-zero distinction, capability parsing, the repair
+      threshold, error mapping, diagnostics redaction and the Clerk sign-in
+      state machine - including fixtures captured from the live API, and
+      nested objects arriving as the wrong type. The HA layer itself has NO
+      tests, which is what keeps this todo.
 
       It is however now PROVEN TO LOAD AND TO READ CORRECTLY on real data.
       A real entry on Home Assistant 2026.9.2 reached state=loaded with all
