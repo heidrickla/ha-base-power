@@ -1,0 +1,83 @@
+name: Validate
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Least privilege: nothing here writes to the repo, publishes, or comments on a PR,
+# so no token scope is needed at all.
+permissions: {}
+
+# A push that supersedes an in-flight run makes that run's answer irrelevant -- and
+# worse, a stale red can arrive AFTER a newer green and be believed. Cancelling frees
+# the runner and leaves the newest answer as the only one. Keyed on ref so main and
+# each PR stay independent.
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+# Gitea's act_runner also picks up .github/workflows, so every job here is
+# gated to GitHub. On the gitea forge these skip and
+# .gitea/workflows/validate.yml is the one that runs - the runner is shared
+# with capacity 1 and duplicate jobs queue behind each other.
+#
+# Ruff, the pure tests, the Home Assistant layer tests, mypy and the offline
+# validator run in tests.yml. This file is the publication side: hassfest and
+# the HACS action, which HACS requires green, plus the secret guard.
+jobs:
+  hassfest: # https://developers.home-assistant.io/blog/2020/04/16/hassfest
+    if: github.server_url == 'https://github.com'
+    name: Hassfest validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run hassfest validation
+        uses: home-assistant/actions/hassfest@a7c616ce81ccda50150bf1595786c71b1883fabb # master
+
+  hacs: # https://github.com/hacs/action
+    if: github.server_url == 'https://github.com'
+    name: HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run HACS validation
+        uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
+        with:
+          category: integration
+
+  secrets:
+    if: github.server_url == 'https://github.com'
+    name: Secret guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Deliberately narrow. It proves the material that must never be committed is
+      # absent -- not that the repo is free of anything sensitive, which no grep can
+      # show. Markdown is excluded because the API notes legitimately quote key-shaped
+      # example blobs, and a guard that cries wolf is one people learn to ignore.
+      - name: No private keys or env files committed
+        run: |
+          set -euo pipefail
+          bad=0
+          keyfiles=$(git ls-files | grep -iE '(^|/)\.env$|\.pem$|\.p12$|\.pfx$|(^|/)id_(rsa|ed25519)$' || true)
+          if [ -n "$keyfiles" ]; then
+            echo "::error::a key or .env file is tracked in git"; echo "$keyfiles"; bad=1
+          fi
+          hits=$(git grep -lIE 'BEGIN (RSA|EC|OPENSSH|PGP|DSA) PRIVATE KEY' -- . ':!*.md' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::a private key block is committed"; echo "$hits"; bad=1
+          fi
+          exit $bad
