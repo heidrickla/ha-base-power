@@ -1,0 +1,30 @@
+// mobile/v2/user.proto
+package dashboard.mobile.v2;
+
+service UserService {
+  rpc GetCurrentUser(dashboard.mobile.v2.GetCurrentUserRequest) returns (dashboard.mobile.v2.GetCurrentUserResponse);
+  rpc GetIntercomIdentity(dashboard.mobile.v2.GetIntercomIdentityRequest) returns (dashboard.mobile.v2.GetIntercomIdentityResponse);
+}
+
+message GetCurrentUserRequest {
+}
+
+message GetCurrentUserResponse {
+  dashboard.mobile.v2.CurrentUser user = 1;
+}
+
+message CurrentUser {
+  string user_id = 1;
+  string email = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string phone_number = 5;
+}
+
+message GetIntercomIdentityRequest {
+}
+
+message GetIntercomIdentityResponse {
+  string user_id = 1;
+  string user_jwt = 2;
+}

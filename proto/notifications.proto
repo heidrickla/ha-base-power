@@ -1,0 +1,50 @@
+// mobile/v2/notifications.proto
+package dashboard.mobile.v2;
+
+service NotificationsService {
+  rpc RegisterPushDevice(dashboard.mobile.v2.RegisterPushDeviceRequest) returns (dashboard.mobile.v2.RegisterPushDeviceResponse);
+  rpc ListNotificationPreferences(dashboard.mobile.v2.ListNotificationPreferencesRequest) returns (dashboard.mobile.v2.ListNotificationPreferencesResponse);
+  rpc UpdateNotificationPreference(dashboard.mobile.v2.UpdateNotificationPreferenceRequest) returns (dashboard.mobile.v2.UpdateNotificationPreferenceResponse);
+}
+
+message NotificationPreference {
+  dashboard.mobile.v2.NotificationChannel channel = 1;
+  dashboard.mobile.v2.NotificationCategory category = 2;
+  bool enabled = 3;
+}
+
+message RegisterPushDeviceRequest {
+  string expo_push_token = 1;
+}
+
+message RegisterPushDeviceResponse {
+}
+
+message ListNotificationPreferencesRequest {
+}
+
+message ListNotificationPreferencesResponse {
+  repeated dashboard.mobile.v2.NotificationPreference preferences = 1;
+}
+
+message UpdateNotificationPreferenceRequest {
+  dashboard.mobile.v2.NotificationChannel channel = 1;
+  dashboard.mobile.v2.NotificationCategory category = 2;
+  bool enabled = 3;
+}
+
+message UpdateNotificationPreferenceResponse {
+}
+
+enum NotificationChannel {
+  NOTIFICATION_CHANNEL_UNSPECIFIED = 0;
+  NOTIFICATION_CHANNEL_PUSH = 1;
+  NOTIFICATION_CHANNEL_SMS = 2;
+}
+
+enum NotificationCategory {
+  NOTIFICATION_CATEGORY_UNSPECIFIED = 0;
+  NOTIFICATION_CATEGORY_ENERGY = 1;
+  NOTIFICATION_CATEGORY_ACCOUNT = 2;
+  NOTIFICATION_CATEGORY_MARKETING = 3;
+}

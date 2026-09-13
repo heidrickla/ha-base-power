@@ -1,0 +1,30 @@
+// mobile/v2/compatibility.proto
+package dashboard.mobile.v2;
+
+service CompatibilityService {
+  rpc CheckAppCompatibility(dashboard.mobile.v2.CheckAppCompatibilityRequest) returns (dashboard.mobile.v2.CheckAppCompatibilityResponse);
+}
+
+message CheckAppCompatibilityRequest {
+  dashboard.mobile.v2.CheckAppCompatibilityRequest.Platform platform = 1;
+  string app_version = 2;
+  uint64 build_number = 3;
+  enum Platform {
+    PLATFORM_UNSPECIFIED = 0;
+    PLATFORM_IOS = 1;
+    PLATFORM_ANDROID = 2;
+  }
+}
+
+message CheckAppCompatibilityResponse {
+  dashboard.mobile.v2.CheckAppCompatibilityResponse.Status status = 1;
+  string minimum_app_version = 2;
+  uint64 minimum_build_number = 3;
+  string message = 4;
+  string store_url = 5;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_SUPPORTED = 1;
+    STATUS_UPDATE_REQUIRED = 2;
+  }
+}

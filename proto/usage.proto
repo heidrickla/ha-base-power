@@ -1,0 +1,111 @@
+// mobile/v2/usage.proto
+package dashboard.mobile.v2;
+
+service UsageService {
+  rpc GetRecentGridVoltage(dashboard.mobile.v2.GetRecentGridVoltageRequest) returns (dashboard.mobile.v2.GetRecentGridVoltageResponse);
+  rpc GetRecentPower(dashboard.mobile.v2.GetRecentPowerRequest) returns (dashboard.mobile.v2.GetRecentPowerResponse);
+  rpc GetDailyEnergy(dashboard.mobile.v2.GetDailyEnergyRequest) returns (dashboard.mobile.v2.GetDailyEnergyResponse);
+  rpc GetDailyOverview(dashboard.mobile.v2.GetDailyOverviewRequest) returns (dashboard.mobile.v2.GetDailyOverviewResponse);
+}
+
+message GetRecentGridVoltageRequest {
+  string address_id = 1;
+}
+
+message GetRecentGridVoltageResponse {
+  repeated dashboard.mobile.v2.GridVoltageSample samples = 1;
+}
+
+message GridVoltageSample {
+  google.protobuf.Timestamp observed_at = 1;
+  double voltage_v = 2;
+}
+
+message GetRecentPowerRequest {
+  string address_id = 1;
+}
+
+message GetRecentPowerResponse {
+  repeated dashboard.mobile.v2.PowerSample samples = 1;
+}
+
+message PowerSample {
+  google.protobuf.Timestamp interval_start = 1;
+  double power_to_home_kw = 2;
+  double power_from_solar_kw = 3;
+}
+
+message GetDailyEnergyRequest {
+  string address_id = 1;
+  google.protobuf.Timestamp service_period_start = 2;
+  google.protobuf.Timestamp service_period_end = 3;
+}
+
+message GetDailyEnergyResponse {
+  repeated dashboard.mobile.v2.DailyEnergySample samples = 1;
+  string cost_currency = 2;
+}
+
+message DailyEnergySample {
+  google.protobuf.Timestamp interval_start = 1;
+  double energy_to_home_kwh = 2;
+  double solar_to_home_kwh = 3;
+  double solar_export_kwh = 4;
+  dashboard.mobile.v2.DailyEnergyCost estimated_cost = 5;
+}
+
+message DailyEnergyCost {
+  double grid_energy_cents = 1;
+  double solar_self_consumption_savings_cents = 2;
+  double solar_export_credit_cents = 3;
+}
+
+message GetDailyOverviewRequest {
+  string address_id = 1;
+}
+
+message GetDailyOverviewResponse {
+  repeated dashboard.mobile.v2.HomePowerSample home_power = 1;
+  repeated dashboard.mobile.v2.BackupDurationSample backup_duration = 2;
+  repeated dashboard.mobile.v2.GridSupportInterval grid_support_intervals = 3;
+  repeated dashboard.mobile.v2.HourlyEnergySample hourly_energy = 4;
+  repeated dashboard.mobile.v2.HourlyEnergyCostSample hourly_energy_costs = 5;
+  string cost_currency = 6;
+  dashboard.mobile.v2.EnergySourceMix energy_source_mix = 7;
+}
+
+message HomePowerSample {
+  google.protobuf.Timestamp interval_start = 1;
+  double power_to_home_kw = 2;
+}
+
+message BackupDurationSample {
+  google.protobuf.Timestamp interval_start = 1;
+  double estimated_backup_hours_at_current_usage = 2;
+  double estimated_backup_hours_at_750_watts = 3;
+}
+
+message GridSupportInterval {
+  google.protobuf.Timestamp interval_start = 1;
+  google.protobuf.Timestamp interval_end = 2;
+}
+
+message HourlyEnergySample {
+  google.protobuf.Timestamp interval_start = 1;
+  double energy_to_home_kwh = 2;
+  double solar_to_home_kwh = 3;
+  double solar_export_kwh = 4;
+}
+
+message HourlyEnergyCostSample {
+  google.protobuf.Timestamp interval_start = 1;
+  double grid_energy_cents = 2;
+  double solar_self_consumption_savings_cents = 3;
+  double solar_export_credit_cents = 4;
+}
+
+message EnergySourceMix {
+  double grid_to_home_kwh = 1;
+  double solar_to_home_kwh = 2;
+  double battery_to_home_kwh = 3;
+}

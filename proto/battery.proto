@@ -1,0 +1,124 @@
+// mobile/v2/battery.proto
+package dashboard.mobile.v2;
+
+service BatteryService {
+  rpc GetSnapshot(dashboard.mobile.v2.GetBatterySnapshotRequest) returns (dashboard.mobile.v2.GetBatterySnapshotResponse);
+  rpc ResetOvercurrent(dashboard.mobile.v2.ResetOvercurrentRequest) returns (dashboard.mobile.v2.BatteryControlAccepted);
+  rpc StartManualBackup(dashboard.mobile.v2.StartManualBackupRequest) returns (dashboard.mobile.v2.BatteryControlAccepted);
+  rpc ListWifiNetworks(dashboard.mobile.v2.ListBatteryWifiNetworksRequest) returns (dashboard.mobile.v2.ListBatteryWifiNetworksResponse);
+  rpc ConnectWifi(dashboard.mobile.v2.ConnectBatteryWifiRequest) returns (dashboard.mobile.v2.BatteryControlAccepted);
+}
+
+message GetBatterySnapshotRequest {
+  string address_id = 1;
+}
+
+message GetBatterySnapshotResponse {
+  dashboard.mobile.v2.BatterySnapshot snapshot = 1;
+}
+
+message ResetOvercurrentRequest {
+  string address_id = 1;
+}
+
+message StartManualBackupRequest {
+  string address_id = 1;
+}
+
+message BatteryControlAccepted {
+}
+
+message ListBatteryWifiNetworksRequest {
+  string address_id = 1;
+}
+
+message ListBatteryWifiNetworksResponse {
+  repeated dashboard.mobile.v2.BatteryWifiNetwork networks = 1;
+  google.protobuf.Timestamp observed_at = 2;
+  bool refresh_requested = 3;
+}
+
+message BatteryWifiNetwork {
+  string ssid = 1;
+  uint32 signal_strength_percent = 2;
+}
+
+message ConnectBatteryWifiRequest {
+  string address_id = 1;
+  string ssid = 2;
+  string password = 3;
+}
+
+message BatterySnapshot {
+  dashboard.mobile.v2.BatteryWifiConnection wifi = 1;
+  dashboard.mobile.v2.BatteryTelemetryUnavailable telemetry_unavailable = 2;
+  dashboard.mobile.v2.BatteryOnGrid on_grid = 3;
+  dashboard.mobile.v2.BatteryOffGridOutage off_grid_outage = 4;
+  dashboard.mobile.v2.BatteryOffGridNoHomePower off_grid_no_home_power = 5;
+  dashboard.mobile.v2.BatteryOffGridOvercurrent off_grid_overcurrent = 6;
+  dashboard.mobile.v2.BatteryOffGridOvercurrentStandby off_grid_overcurrent_standby = 7;
+}
+
+message BatteryTelemetryUnavailable {
+}
+
+message BatteryOnGrid {
+  google.protobuf.Timestamp observed_at = 1;
+  dashboard.mobile.v2.BatteryPowerFlow power_flow = 2;
+  double estimated_backup_hours_at_current_usage = 3;
+  double estimated_backup_hours_at_750_watts = 4;
+}
+
+message BatteryOffGridOutage {
+  google.protobuf.Timestamp observed_at = 1;
+  int32 state_of_energy_percent = 2;
+  dashboard.mobile.v2.BatteryPowerFlow power_flow = 3;
+  double estimated_backup_hours_at_current_usage = 4;
+  double estimated_backup_hours_at_750_watts = 5;
+}
+
+message BatteryOffGridNoHomePower {
+  google.protobuf.Timestamp observed_at = 1;
+  int32 state_of_energy_percent = 2;
+  double estimated_backup_hours_at_current_usage = 3;
+  double estimated_backup_hours_at_750_watts = 4;
+}
+
+message BatteryOffGridOvercurrent {
+  google.protobuf.Timestamp observed_at = 1;
+  int32 state_of_energy_percent = 2;
+  dashboard.mobile.v2.BatteryPowerFlow power_flow = 3;
+  double estimated_backup_hours_at_current_usage = 4;
+  double estimated_backup_hours_at_750_watts = 5;
+  double overcurrent_limit_kw = 6;
+}
+
+message BatteryOffGridOvercurrentStandby {
+  google.protobuf.Timestamp observed_at = 1;
+  int32 state_of_energy_percent = 2;
+  double estimated_backup_hours_at_current_usage = 3;
+  double estimated_backup_hours_at_750_watts = 4;
+  double overcurrent_limit_kw = 5;
+}
+
+message BatteryPowerFlow {
+  double from_grid_kw = 1;
+  double from_storage_kw = 2;
+  double from_solar_kw = 3;
+  double non_solar_to_home_kw = 4;
+  double to_home_kw = 5;
+}
+
+message BatteryWifiConnection {
+  dashboard.mobile.v2.BatteryWifiConnectionStatus status = 1;
+  string ssid = 2;
+  google.protobuf.Timestamp observed_at = 3;
+}
+
+enum BatteryWifiConnectionStatus {
+  BATTERY_WIFI_CONNECTION_STATUS_UNSPECIFIED = 0;
+  BATTERY_WIFI_CONNECTION_STATUS_UNAVAILABLE = 1;
+  BATTERY_WIFI_CONNECTION_STATUS_NOT_CONNECTED = 2;
+  BATTERY_WIFI_CONNECTION_STATUS_CONNECTING = 3;
+  BATTERY_WIFI_CONNECTION_STATUS_CONNECTED = 4;
+}

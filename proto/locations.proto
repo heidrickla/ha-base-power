@@ -1,0 +1,149 @@
+// mobile/v2/locations.proto
+package dashboard.mobile.v2;
+
+service LocationsService {
+  rpc ListLocations(dashboard.mobile.v2.ListLocationsRequest) returns (dashboard.mobile.v2.ListLocationsResponse);
+  rpc GetLocation(dashboard.mobile.v2.GetLocationRequest) returns (dashboard.mobile.v2.GetLocationResponse);
+}
+
+message ListLocationsRequest {
+}
+
+message ListLocationsResponse {
+  repeated dashboard.mobile.v2.LocationSummary locations = 1;
+}
+
+message GetLocationRequest {
+  string address_id = 1;
+}
+
+message GetLocationResponse {
+  dashboard.mobile.v2.Location location = 1;
+}
+
+message LocationSummary {
+  string address_id = 1;
+  dashboard.mobile.v2.DisplayAddress address = 2;
+  dashboard.mobile.v2.LocationStatus status = 3;
+}
+
+message DisplayAddress {
+  string line_1 = 1;
+  string line_2 = 2;
+  string city = 3;
+  string state = 4;
+  string postal_code = 5;
+  string country = 6;
+  string timezone = 7;
+}
+
+message Location {
+  dashboard.mobile.v2.LocationSummary summary = 1;
+  dashboard.mobile.v2.EnergyState energy = 2;
+  dashboard.mobile.v2.BatteryState battery = 3;
+  dashboard.mobile.v2.LocationCapabilities capabilities = 4;
+  dashboard.mobile.v2.ReferralCapability referrals = 5;
+  dashboard.mobile.v2.SupportCapability support = 6;
+}
+
+message EnergyState {
+  dashboard.mobile.v2.EnergyUnknown unknown = 1;
+  dashboard.mobile.v2.NoEnergyService no_service = 2;
+  dashboard.mobile.v2.EnergyPlanned planned = 3;
+  dashboard.mobile.v2.EnergyActivating activating = 4;
+  dashboard.mobile.v2.EnergyActive active = 5;
+  dashboard.mobile.v2.EnergyEnding ending = 6;
+  dashboard.mobile.v2.EnergyEnded ended = 7;
+}
+
+message EnergyUnknown {
+}
+
+message NoEnergyService {
+}
+
+message EnergyPlanned {
+}
+
+message EnergyActivating {
+}
+
+message EnergyActive {
+}
+
+message EnergyEnding {
+}
+
+message EnergyEnded {
+}
+
+message BatteryState {
+  dashboard.mobile.v2.BatteryUnknown unknown = 1;
+  dashboard.mobile.v2.NoBattery no_battery = 2;
+  dashboard.mobile.v2.BatteryPlanned planned = 3;
+  dashboard.mobile.v2.BatteryActivating activating = 4;
+  dashboard.mobile.v2.BatteryOnsite onsite = 5;
+  dashboard.mobile.v2.BatteryEnded ended = 6;
+}
+
+message BatteryUnknown {
+}
+
+message NoBattery {
+}
+
+message BatteryPlanned {
+}
+
+message BatteryActivating {
+}
+
+message BatteryOnsite {
+  dashboard.mobile.v2.BatteryCapabilities capabilities = 1;
+  google.protobuf.Timestamp upcoming_service_at = 2;
+  google.protobuf.Timestamp upcoming_deinstallation_at = 3;
+}
+
+message BatteryEnded {
+}
+
+message BatteryCapabilities {
+  bool telemetry = 1;
+  bool automatic_backup = 2;
+  bool wifi_management = 3;
+}
+
+message LocationCapabilities {
+  bool has_solar = 1;
+  bool billing = 2;
+}
+
+message ReferralCapability {
+  dashboard.mobile.v2.ReferralsUnavailable unavailable = 1;
+  dashboard.mobile.v2.ReferralsAvailable available = 2;
+}
+
+message ReferralsUnavailable {
+}
+
+message ReferralsAvailable {
+  string url = 1;
+  string plan_id = 2;
+  string card_title = 3;
+  string card_text = 4;
+  string referrals_title = 5;
+  string referrals_text = 6;
+  string terms_url = 7;
+}
+
+enum LocationStatus {
+  LOCATION_STATUS_UNSPECIFIED = 0;
+  LOCATION_STATUS_ACTIVE = 1;
+  LOCATION_STATUS_DEACTIVATED = 2;
+}
+
+enum SupportCapability {
+  SUPPORT_CAPABILITY_UNSPECIFIED = 0;
+  SUPPORT_CAPABILITY_FULL = 1;
+  SUPPORT_CAPABILITY_CHAT_ONLY = 2;
+}

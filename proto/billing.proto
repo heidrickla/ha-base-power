@@ -1,0 +1,534 @@
+// mobile/v2/billing.proto
+package dashboard.mobile.v2;
+
+service BillingService {
+  rpc ListAccounts(dashboard.mobile.v2.ListAccountsRequest) returns (dashboard.mobile.v2.ListAccountsResponse);
+  rpc GetAccount(dashboard.mobile.v2.GetAccountRequest) returns (dashboard.mobile.v2.GetAccountResponse);
+  rpc ListObligations(dashboard.mobile.v2.ListObligationsRequest) returns (dashboard.mobile.v2.ListObligationsResponse);
+  rpc GetObligation(dashboard.mobile.v2.GetObligationRequest) returns (dashboard.mobile.v2.GetObligationResponse);
+  rpc ListPayments(dashboard.mobile.v2.ListPaymentsRequest) returns (dashboard.mobile.v2.ListPaymentsResponse);
+  rpc GetPayment(dashboard.mobile.v2.GetPaymentRequest) returns (dashboard.mobile.v2.GetPaymentResponse);
+  rpc GetCurrentBillingCycle(dashboard.mobile.v2.GetCurrentBillingCycleRequest) returns (dashboard.mobile.v2.GetCurrentBillingCycleResponse);
+  rpc ListUsageCycles(dashboard.mobile.v2.ListUsageCyclesRequest) returns (dashboard.mobile.v2.ListUsageCyclesResponse);
+  rpc CreateAccountPayment(dashboard.mobile.v2.CreateAccountPaymentRequest) returns (dashboard.mobile.v2.CreateAccountPaymentResponse);
+  rpc CreatePaymentMethodSession(dashboard.mobile.v2.CreatePaymentMethodSessionRequest) returns (dashboard.mobile.v2.CreatePaymentMethodSessionResponse);
+  rpc UpdatePaymentMethod(dashboard.mobile.v2.UpdatePaymentMethodRequest) returns (dashboard.mobile.v2.UpdatePaymentMethodResponse);
+}
+
+message AccountReference {
+  string address_id = 1;
+  dashboard.mobile.v2.AccountType account_type = 2;
+}
+
+message ListAccountsRequest {
+  string address_id = 1;
+}
+
+message ListAccountsResponse {
+  repeated dashboard.mobile.v2.AccountSummary accounts = 1;
+  string member_account_number = 2;
+  dashboard.mobile.v2.EnergyService energy_service = 3;
+}
+
+message GetAccountRequest {
+  dashboard.mobile.v2.AccountReference account = 1;
+  int64 rate_estimate_usage_kwh = 2;
+}
+
+message GetAccountResponse {
+  dashboard.mobile.v2.Account account = 1;
+  string member_account_number = 2;
+  dashboard.mobile.v2.EnergyService energy_service = 3;
+}
+
+message AccountSummary {
+  dashboard.mobile.v2.AccountType account_type = 1;
+  string currency = 2;
+  dashboard.mobile.v2.AccountStatus status = 3;
+  int64 last_bill_amount_cents = 4;
+  int64 outstanding_balance_cents = 5;
+  int64 past_due_balance_cents = 6;
+  google.protobuf.Timestamp next_autopay_date = 7;
+  google.protobuf.Timestamp next_bill_date = 8;
+  bool has_billing_history = 9;
+  dashboard.mobile.v2.OpenObligation oldest_open_obligation = 10;
+}
+
+message EnergyService {
+  dashboard.mobile.v2.EnergyServiceStatus status = 1;
+  google.protobuf.Timestamp started_at = 2;
+  google.protobuf.Timestamp terminated_at = 3;
+}
+
+message Account {
+  dashboard.mobile.v2.AccountSummary summary = 1;
+  dashboard.mobile.v2.Plan plan = 2;
+  dashboard.mobile.v2.EnergyRateEstimate energy_rate_estimate = 3;
+  repeated dashboard.mobile.v2.AvailableCredit available_credits = 4;
+  repeated dashboard.mobile.v2.PaymentOption payment_options = 5;
+  dashboard.mobile.v2.PaymentMethodDisplay current_payment_method = 6;
+}
+
+message OpenObligation {
+  string id = 1;
+  dashboard.mobile.v2.ObligationType type = 2;
+  int64 original_amount_cents = 3;
+  google.protobuf.Timestamp due_at = 4;
+  google.protobuf.Timestamp autopay_date = 5;
+  google.protobuf.Timestamp service_disconnection_at = 6;
+  bool past_due = 7;
+}
+
+message AvailableCredit {
+  string id = 1;
+  string title = 2;
+  int64 available_amount_cents = 3;
+  string currency = 4;
+  dashboard.mobile.v2.CreditAmountQualifier amount_qualifier = 5;
+  int64 original_amount_cents = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message PaymentOption {
+  string id = 1;
+  dashboard.mobile.v2.PaymentOptionType type = 2;
+  int64 amount_cents = 3;
+  string currency = 4;
+  google.protobuf.Timestamp pay_by = 5;
+}
+
+message PaymentMethodDisplay {
+  dashboard.mobile.v2.PaymentMethodDisplay.Card card = 1;
+  dashboard.mobile.v2.PaymentMethodDisplay.Bank bank = 2;
+  message Card {
+    string last_four = 1;
+    string brand = 2;
+  }
+  message Bank {
+    string bank_name = 1;
+  }
+}
+
+message EnergyRateEstimate {
+  double all_in_rate_cents_per_kwh = 1;
+  int64 usage_kwh = 2;
+  dashboard.mobile.v2.UtilityDeliveryCharges utility_delivery_charges = 3;
+  google.protobuf.Timestamp as_of = 4;
+}
+
+message UtilityDeliveryCharges {
+  double rate_cents_per_kwh = 1;
+  double monthly_charge_cents = 2;
+}
+
+message Plan {
+  string display_name = 1;
+  dashboard.mobile.v2.EnergyPlan energy = 2;
+  dashboard.mobile.v2.BatteryPlan battery = 3;
+}
+
+message EnergyPlan {
+  dashboard.mobile.v2.EnergySupply supply = 1;
+  int64 monthly_charge_cents = 2;
+  int32 term_months = 3;
+  dashboard.mobile.v2.EarlyTerminationFee early_termination_fee = 4;
+  double renewable_percentage = 5;
+  dashboard.mobile.v2.EnergyDelivery delivery = 6;
+  dashboard.mobile.v2.SolarBuyback solar_buyback = 7;
+}
+
+message EnergySupply {
+  dashboard.mobile.v2.SupplyRate default_rate = 1;
+  repeated dashboard.mobile.v2.TimeOfUseSupplyRate time_of_use_rates = 2;
+}
+
+message SupplyRate {
+  dashboard.mobile.v2.FixedSupplyRate fixed = 1;
+  dashboard.mobile.v2.IndexedSupplyRate indexed = 2;
+  dashboard.mobile.v2.SubscriptionSupplyRate subscription = 3;
+}
+
+message FixedSupplyRate {
+  double rate_cents_per_kwh = 1;
+}
+
+message IndexedSupplyRate {
+  dashboard.mobile.v2.SupplyIndex index = 1;
+  double discount_percentage = 2;
+}
+
+message SubscriptionSupplyRate {
+}
+
+message TimeOfUseSupplyRate {
+  dashboard.mobile.v2.TimeWindow window = 1;
+  dashboard.mobile.v2.SupplyRate rate = 2;
+}
+
+message TimeWindow {
+  repeated dashboard.mobile.v2.DayOfWeek days = 1;
+  int32 start_hour = 2;
+  int32 end_hour = 3;
+}
+
+message EnergyDelivery {
+  dashboard.mobile.v2.DeliveryPassthrough passthrough = 1;
+  dashboard.mobile.v2.DeliveryPercentageCredit percentage_credit = 2;
+  dashboard.mobile.v2.DeliveryIncluded included = 3;
+}
+
+message DeliveryPassthrough {
+}
+
+message DeliveryPercentageCredit {
+  double percentage = 1;
+}
+
+message DeliveryIncluded {
+}
+
+message EarlyTerminationFee {
+  int64 amount_cents_per_remaining_month = 1;
+}
+
+message SolarBuyback {
+  dashboard.mobile.v2.FixedSolarBuyback fixed = 1;
+  dashboard.mobile.v2.RealtimeSolarBuyback realtime = 2;
+  dashboard.mobile.v2.MatchSupplySolarBuyback match_supply = 3;
+}
+
+message FixedSolarBuyback {
+  double rate_cents_per_kwh = 1;
+}
+
+message RealtimeSolarBuyback {
+  double adder_cents_per_kwh = 1;
+}
+
+message MatchSupplySolarBuyback {
+}
+
+message BatteryPlan {
+  repeated dashboard.mobile.v2.BatteryEquipment equipment = 1;
+  int64 monthly_payment_cents = 2;
+  int32 term_months = 3;
+}
+
+message BatteryEquipment {
+  string description = 1;
+  string hardware_sku = 2;
+  double energy_rate_offset_cents_per_kwh = 3;
+}
+
+message ListObligationsRequest {
+  dashboard.mobile.v2.AccountReference account = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListObligationsResponse {
+  repeated dashboard.mobile.v2.Obligation obligations = 1;
+  string next_page_token = 2;
+}
+
+message GetObligationRequest {
+  dashboard.mobile.v2.AccountReference account = 1;
+  string obligation_id = 2;
+}
+
+message GetObligationResponse {
+  dashboard.mobile.v2.Obligation obligation = 1;
+  repeated dashboard.mobile.v2.Payment related_payments = 2;
+}
+
+message Obligation {
+  string id = 1;
+  dashboard.mobile.v2.ObligationType type = 2;
+  dashboard.mobile.v2.ObligationStatus status = 3;
+  int64 original_amount_cents = 4;
+  string currency = 5;
+  google.protobuf.Timestamp issued_at = 6;
+  google.protobuf.Timestamp due_at = 7;
+  google.protobuf.Timestamp autopay_date = 8;
+  google.protobuf.Timestamp service_period_start = 9;
+  google.protobuf.Timestamp service_period_end = 10;
+  google.protobuf.Timestamp service_disconnection_at = 11;
+  bool past_due = 12;
+  dashboard.mobile.v2.Document document = 13;
+  repeated string related_payment_ids = 14;
+  repeated dashboard.mobile.v2.LineCategory line_categories = 15;
+  string title = 16;
+}
+
+message Document {
+  string url = 1;
+  string download_name = 2;
+}
+
+message LineCategory {
+  string title = 1;
+  dashboard.mobile.v2.LineCategoryKind kind = 2;
+  int64 total_cents = 3;
+  repeated dashboard.mobile.v2.LineItem items = 4;
+}
+
+message LineItem {
+  string title = 1;
+  string description = 2;
+  int64 amount_cents = 3;
+}
+
+message ListPaymentsRequest {
+  dashboard.mobile.v2.AccountReference account = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListPaymentsResponse {
+  repeated dashboard.mobile.v2.Payment payments = 1;
+  string next_page_token = 2;
+}
+
+message GetPaymentRequest {
+  dashboard.mobile.v2.AccountReference account = 1;
+  string payment_id = 2;
+}
+
+message GetPaymentResponse {
+  dashboard.mobile.v2.Payment payment = 1;
+}
+
+message Payment {
+  string id = 1;
+  dashboard.mobile.v2.PaymentStatus status = 2;
+  int64 amount_cents = 3;
+  string currency = 4;
+  google.protobuf.Timestamp initiated_at = 5;
+  google.protobuf.Timestamp effective_at = 6;
+  int64 refunded_amount_cents = 7;
+  repeated dashboard.mobile.v2.PaymentAttempt attempts = 8;
+  repeated dashboard.mobile.v2.DocumentReference related_documents = 9;
+  repeated dashboard.mobile.v2.Refund refunds = 10;
+  dashboard.mobile.v2.PaymentType type = 11;
+  string description = 12;
+  dashboard.mobile.v2.PaymentMethodDisplay historical_payment_method = 13;
+}
+
+message DocumentReference {
+  dashboard.mobile.v2.DocumentType type = 1;
+  string url = 2;
+  string download_name = 3;
+}
+
+message PaymentAttempt {
+  dashboard.mobile.v2.PaymentAttemptStatus status = 1;
+  google.protobuf.Timestamp initiated_at = 2;
+  google.protobuf.Timestamp completed_at = 3;
+}
+
+message Refund {
+  dashboard.mobile.v2.RefundStatus status = 1;
+  int64 amount_cents = 2;
+  string currency = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp effective_at = 5;
+}
+
+message GetCurrentBillingCycleRequest {
+  dashboard.mobile.v2.AccountReference account = 1;
+}
+
+message GetCurrentBillingCycleResponse {
+  dashboard.mobile.v2.CurrentBillingCycle cycle = 1;
+}
+
+message CurrentBillingCycle {
+  string currency = 1;
+  google.protobuf.Timestamp service_period_start = 2;
+  google.protobuf.Timestamp data_from = 3;
+  google.protobuf.Timestamp data_through = 4;
+  int64 gross_consumption_charges_cents = 5;
+  int64 solar_buyback_credit_cents = 6;
+  int64 net_accrued_amount_cents = 7;
+  int64 projected_gross_consumption_charges_cents = 8;
+}
+
+message ListUsageCyclesRequest {
+  dashboard.mobile.v2.AccountReference account = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListUsageCyclesResponse {
+  repeated dashboard.mobile.v2.UsageCycle cycles = 1;
+  string next_page_token = 2;
+}
+
+message UsageCycle {
+  google.protobuf.Timestamp service_period_start = 1;
+  google.protobuf.Timestamp service_period_end = 2;
+  string billing_obligation_id = 3;
+}
+
+message CreateAccountPaymentRequest {
+  dashboard.mobile.v2.AccountReference account = 1;
+  string payment_option_id = 2;
+  int64 expected_amount_cents = 3;
+  string idempotency_key = 4;
+}
+
+message CreateAccountPaymentResponse {
+  int64 accepted_amount_cents = 1;
+  string currency = 2;
+}
+
+message CommandFailureDetail {
+  dashboard.mobile.v2.CommandFailureReason reason = 1;
+}
+
+message CreatePaymentMethodSessionRequest {
+  string address_id = 1;
+}
+
+message CreatePaymentMethodSessionResponse {
+  string client_secret = 1;
+  string stripe_publishable_key = 2;
+  dashboard.mobile.v2.BillingAddress default_billing_address = 3;
+}
+
+message BillingAddress {
+  string line_1 = 1;
+  string line_2 = 2;
+  string city = 3;
+  string state = 4;
+  string postal_code = 5;
+  string country = 6;
+}
+
+message UpdatePaymentMethodRequest {
+  string address_id = 1;
+  string setup_intent_id = 2;
+}
+
+message UpdatePaymentMethodResponse {
+}
+
+enum AccountType {
+  ACCOUNT_TYPE_UNSPECIFIED = 0;
+  ACCOUNT_TYPE_ENERGY = 1;
+  ACCOUNT_TYPE_BATTERY = 2;
+}
+
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0;
+  ACCOUNT_STATUS_NO_PAYMENT_DUE = 1;
+  ACCOUNT_STATUS_SCHEDULED = 2;
+  ACCOUNT_STATUS_PAST_DUE = 3;
+}
+
+enum EnergyServiceStatus {
+  ENERGY_SERVICE_STATUS_UNSPECIFIED = 0;
+  ENERGY_SERVICE_STATUS_ACTIVE = 1;
+  ENERGY_SERVICE_STATUS_PENDING_CANCELLATION = 2;
+  ENERGY_SERVICE_STATUS_TERMINATED = 3;
+}
+
+enum ObligationType {
+  OBLIGATION_TYPE_UNSPECIFIED = 0;
+  OBLIGATION_TYPE_ENERGY_BILL = 1;
+  OBLIGATION_TYPE_BATTERY_BILL = 2;
+  OBLIGATION_TYPE_INVOICE = 3;
+}
+
+enum ObligationStatus {
+  OBLIGATION_STATUS_UNSPECIFIED = 0;
+  OBLIGATION_STATUS_PAID = 1;
+  OBLIGATION_STATUS_NO_PAYMENT_DUE = 2;
+  OBLIGATION_STATUS_SCHEDULED = 3;
+  OBLIGATION_STATUS_PAYMENT_FAILED = 4;
+}
+
+enum PaymentType {
+  PAYMENT_TYPE_UNSPECIFIED = 0;
+  PAYMENT_TYPE_COLLECTION = 1;
+  PAYMENT_TYPE_CREDIT = 2;
+}
+
+enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0;
+  PAYMENT_STATUS_PROCESSING = 1;
+  PAYMENT_STATUS_SUCCEEDED = 2;
+  PAYMENT_STATUS_FAILED = 3;
+  PAYMENT_STATUS_CANCELLED = 4;
+}
+
+enum PaymentAttemptStatus {
+  PAYMENT_ATTEMPT_STATUS_UNSPECIFIED = 0;
+  PAYMENT_ATTEMPT_STATUS_PROCESSING = 1;
+  PAYMENT_ATTEMPT_STATUS_SUCCEEDED = 2;
+  PAYMENT_ATTEMPT_STATUS_FAILED = 3;
+}
+
+enum RefundStatus {
+  REFUND_STATUS_UNSPECIFIED = 0;
+  REFUND_STATUS_PROCESSING = 1;
+  REFUND_STATUS_COMPLETED = 2;
+  REFUND_STATUS_FAILED = 3;
+}
+
+enum DocumentType {
+  DOCUMENT_TYPE_UNSPECIFIED = 0;
+  DOCUMENT_TYPE_ENERGY_BILL = 1;
+  DOCUMENT_TYPE_BATTERY_BILL = 2;
+  DOCUMENT_TYPE_INVOICE = 3;
+}
+
+enum PaymentOptionType {
+  PAYMENT_OPTION_TYPE_UNSPECIFIED = 0;
+  PAYMENT_OPTION_TYPE_FULL_BALANCE = 1;
+  PAYMENT_OPTION_TYPE_AVOID_LATE_FEE = 2;
+  PAYMENT_OPTION_TYPE_AVOID_SERVICE_DISCONNECTION = 3;
+}
+
+enum CreditAmountQualifier {
+  CREDIT_AMOUNT_QUALIFIER_UNSPECIFIED = 0;
+  CREDIT_AMOUNT_QUALIFIER_FIXED = 1;
+  CREDIT_AMOUNT_QUALIFIER_UP_TO = 2;
+}
+
+enum LineCategoryKind {
+  LINE_CATEGORY_KIND_UNSPECIFIED = 0;
+  LINE_CATEGORY_KIND_OTHER_CHARGES = 1;
+  LINE_CATEGORY_KIND_ENERGY = 2;
+  LINE_CATEGORY_KIND_BATTERY = 3;
+  LINE_CATEGORY_KIND_SOLAR_CREDITS = 4;
+  LINE_CATEGORY_KIND_UTILITY_CHARGES = 5;
+  LINE_CATEGORY_KIND_BASE_CREDITS = 6;
+  LINE_CATEGORY_KIND_MONTHLY_FEE = 7;
+  LINE_CATEGORY_KIND_PREVIOUS_BILL = 8;
+}
+
+enum SupplyIndex {
+  SUPPLY_INDEX_UNSPECIFIED = 0;
+  SUPPLY_INDEX_COMED_PTC = 1;
+  SUPPLY_INDEX_COMED_PTC_PEA = 2;
+}
+
+enum DayOfWeek {
+  DAY_OF_WEEK_UNSPECIFIED = 0;
+  DAY_OF_WEEK_MONDAY = 1;
+  DAY_OF_WEEK_TUESDAY = 2;
+  DAY_OF_WEEK_WEDNESDAY = 3;
+  DAY_OF_WEEK_THURSDAY = 4;
+  DAY_OF_WEEK_FRIDAY = 5;
+  DAY_OF_WEEK_SATURDAY = 6;
+  DAY_OF_WEEK_SUNDAY = 7;
+}
+
+enum CommandFailureReason {
+  COMMAND_FAILURE_REASON_UNSPECIFIED = 0;
+  COMMAND_FAILURE_REASON_STALE_QUOTE = 1;
+  COMMAND_FAILURE_REASON_NO_PAYMENT_METHOD = 2;
+  COMMAND_FAILURE_REASON_EXECUTION_OUTCOME_UNKNOWN = 3;
+  COMMAND_FAILURE_REASON_NO_INSTALLED_GATEWAY = 4;
+}
