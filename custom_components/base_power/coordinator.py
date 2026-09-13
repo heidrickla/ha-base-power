@@ -13,6 +13,7 @@ from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -24,7 +25,15 @@ from .api import (
     LocationCapabilities,
 )
 from .clerk import ClerkAuthError, ClerkSessionProvider
-from .const import CONF_ADDRESS_ID, CONF_CLIENT_JWT, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import (
+    CONF_ADDRESS_ID,
+    CONF_CLIENT_JWT,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    ISSUE_TELEMETRY_UNAVAILABLE,
+    MIN_TELEMETRY_POLLS,
+    TELEMETRY_GRACE,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,6 +73,9 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
         # line rather than being mistaken for a transition that never
         # happened.
         self._telemetry_available: bool | None = None
+        # Consecutive polls with no telemetry, so a blip does not raise a
+        # repair issue the user then has to dismiss.
+        self._silent_polls = 0
 
     async def async_load_capabilities(self) -> None:
         """Ask the site what it has, before any entity is created.
@@ -82,37 +94,72 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
                 err,
             )
 
-    def _note_telemetry(self, snapshot: BatterySnapshot) -> None:
-        """Say once when the battery stops reporting, and once when it returns.
+    @property
+    def _silent_polls_before_issue(self) -> int:
+        """How many quiet polls the grace period is worth at this interval."""
+        seconds = (
+            self.update_interval.total_seconds()
+            if self.update_interval
+            else DEFAULT_SCAN_INTERVAL.total_seconds()
+        )
+        return max(MIN_TELEMETRY_POLLS, round(TELEMETRY_GRACE.total_seconds() / seconds))
 
-        This is the condition that takes almost every entity unavailable while
-        the poll itself stays perfectly healthy, so without a line saying so
-        the logs show nothing at all and the integration looks broken when it
-        is working exactly as designed. Once per transition, not per poll:
-        at 30 s intervals that would be 2,880 identical lines a day.
+    def _note_telemetry(self, snapshot: BatterySnapshot) -> None:
+        """Track the battery falling silent: log it, and raise a repair issue.
+
+        Two different jobs. The log line exists because this is the condition
+        that takes almost every entity unavailable while the poll itself stays
+        perfectly healthy - DataUpdateCoordinator only speaks when a poll
+        FAILS, so without this the logs are silent exactly when the
+        integration looks broken. Once per transition, not per poll.
+
+        The repair issue is the user-facing half, and it deliberately waits:
+        a single quiet poll is not worth a notification, and at the default
+        interval raising and clearing on blips would produce two repairs a
+        minute. It clears the moment telemetry returns.
         """
         available = snapshot.telemetry_available
-        if available == self._telemetry_available:
-            return
-        # Nothing is logged for the very first poll of a healthy battery -
-        # there is no transition worth reporting.
-        if self._telemetry_available is None and available:
+
+        if available:
+            self._silent_polls = 0
+            # Cleared unconditionally rather than only on an observed
+            # transition: if Home Assistant restarted while the battery was
+            # dark, this instance never saw the issue raised, but the issue
+            # is still sitting in the repairs list.
+            ir.async_delete_issue(self.hass, DOMAIN, ISSUE_TELEMETRY_UNAVAILABLE)
+            if self._telemetry_available is False:
+                _LOGGER.info("The Base Power battery is reporting telemetry again")
             self._telemetry_available = True
             return
-        self._telemetry_available = available
-        if not available:
+
+        self._silent_polls += 1
+        if self._telemetry_available is not False:
+            self._telemetry_available = False
             _LOGGER.warning(
                 "The Base Power battery is not reporting telemetry (state %s, "
-                "Wi-Fi %s). The connection to Base is fine - this poll succeeded - "
-                "so the battery itself is not sending data, and its entities are "
-                "unavailable rather than showing a stale or zero reading. Check "
-                "the battery's network connection; the Base app will show the "
-                "same gap",
+                "battery Wi-Fi %s). The connection to Base is fine - this poll "
+                "succeeded - so the battery itself is not sending data, and its "
+                "entities are unavailable rather than showing a stale or zero "
+                "reading. Backup during a grid outage is unaffected",
                 snapshot.state,
                 snapshot.wifi_status or "unknown",
             )
-        else:
-            _LOGGER.info("The Base Power battery is reporting telemetry again")
+
+        if self._silent_polls >= self._silent_polls_before_issue:
+            # Re-created every poll once over the threshold, which is how the
+            # issue comes back by itself after a restart. async_create_issue
+            # is idempotent for the same id.
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                ISSUE_TELEMETRY_UNAVAILABLE,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key=ISSUE_TELEMETRY_UNAVAILABLE,
+                translation_placeholders={
+                    "name": self.config_entry.title if self.config_entry else "Base Power",
+                },
+            )
 
     async def _async_update_data(self) -> BatterySnapshot:
         try:

@@ -51,6 +51,12 @@
       "reauth_successful": "Base Power was signed in again."
     }
   },
+  "issues": {
+    "telemetry_unavailable": {
+      "title": "{name} is not sending data",
+      "description": "Base Power reports that your battery is not currently sending data, and Base's own app shows the same thing.\n\n**Your backup is not affected.** In a grid outage the battery will still power your home, even while it is not reporting.\n\nWhat this means in Home Assistant: the battery's sensors show **unavailable**, and the battery state sensor reads *Telemetry unavailable*. That is deliberate. There is no current reading to show, and displaying the last known value — or a zero — would look like a real measurement of a house drawing no power.\n\n**Home Assistant cannot fix this.** The gap is between the battery and Base; the connection from Home Assistant to Base is working, which is how this was detected. If it does not clear on its own, contact Base Support.\n\nThis notice clears by itself as soon as the battery starts reporting again."
+    }
+  },
   "options": {
     "step": {
       "init": {

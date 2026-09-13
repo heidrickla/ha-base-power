@@ -261,10 +261,22 @@ rules:
       Only reauth exists. There is nothing else to reconfigure yet - the
       address is discovered, not entered.
   repair-issues:
-    status: exempt
+    status: done
     comment: |
-      The one actionable failure is the credential expiring, which is a
-      reauth flow rather than a repair.
+      A telemetry_unavailable repair issue, which is Home Assistant's form of
+      the banner Base's own app shows for the same condition. It explains
+      what the state means, that backup during a grid outage is unaffected,
+      that the unavailable entities are deliberate, and that Home Assistant
+      cannot fix it - the gap is between the battery and Base.
+
+      Not raised on a single quiet poll: the threshold is a five-minute grace
+      period converted to polls against whatever interval is configured, so a
+      blip does not raise and clear a repair twice a minute and a user on a
+      long interval does not wait hours. Cleared unconditionally on recovery
+      rather than only on an observed transition, and re-created while the
+      condition persists, so it survives a restart in both directions.
+
+      The credential expiring is still a reauth flow rather than a repair.
   stale-devices:
     status: exempt
     comment: One device per entry; removing the entry removes it.

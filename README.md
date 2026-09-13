@@ -18,11 +18,17 @@ The app is React Native on Hermes and talks **Connect RPC** to
 
 ## Status
 
-**The contract is confirmed live** (2026-09-13, read-only): auth, `ListLocations`
-and `GetSnapshot` all answered. Statements in
-`docs/API.md` still marked unconfirmed remain readings of the app binary. The
-integration itself does not exist yet; this repo holds the contract it will
-be written against.
+**Running on Home Assistant as of 2026-09-13.** The emailed-code sign-in
+completed against the live service, the entry loaded on Home Assistant
+2026.9.2, and nine entities were created. The contract behind it is confirmed
+live too: auth, `ListLocations`, `GetLocation` and `GetSnapshot` all answered.
+
+What is **not** yet observed is live battery VALUES: the site has been
+answering `telemetry_unavailable` since shortly after setup - the battery is
+not reporting to Base, which Base's own app confirms - so `on_grid`, a
+negative `power from storage` and the binary sensors reading `off` have never
+been seen on real data. Statements in `docs/API.md` still marked unconfirmed
+remain readings of the app binary.
 
 ## Setting it up
 
@@ -42,10 +48,8 @@ account with two-factor authentication, or a change at Clerk that breaks the
 code flow. It takes the `__client` cookie from a browser session — see
 `docs/API.md`.
 
-**Neither path has been run against the live service yet.** Requesting a code
-emails a real person, so the sign-in is built from the app's own protocol and
-covered by tests with faked responses; the first real setup is the first test
-of it.
+The emailed-code path has been run successfully against the live service. The
+paste path has not - it exists for the accounts the code route cannot cover.
 
 ## Supported devices
 
@@ -165,7 +169,7 @@ Entity ids follow your site's device name, so adjust them to match.
 |---|---|
 | **State of charge is `unknown`** | Expected while on grid. Base only publishes it off grid. Use **Stored energy** instead. |
 | **No solar sensor** | The site does not declare solar. Base omits the field, so the sensor is not created rather than reading a false zero. |
-| **Everything is unavailable, but the integration looks fine** | Either the poll is failing, or Base answered `telemetry_unavailable`. Check **Battery state** — it stays available and says which. If it reads `telemetry_unavailable`, the integration is working and **the battery is not reporting to Base**. Check the **Battery Wi-Fi network** diagnostic sensor (enable it) and the Base app: a unit that has lost its network connection cannot report, and the app will show the same gap. This is not something Home Assistant can fix. |
+| **Everything is unavailable, but the integration looks fine** | Either the poll is failing, or Base answered `telemetry_unavailable`. Check **Battery state** — it stays available and says which. If it reads `telemetry_unavailable`, the integration is working and **the battery is not reporting to Base** — Base's own app shows the same banner. Home Assistant raises a repair notice after five minutes explaining it. Your backup is unaffected: the battery still powers the house in an outage while dark. Contact Base Support if it does not clear. Note the battery does **not** report over Wi-Fi, so the Wi-Fi sensor is not the thing to chase (see `docs/API.md`). |
 | **Asked to sign in again** | A Base session ended or was revoked. Reauthentication re-sends a code to the stored address. |
 | **"Base Power is temporarily refusing sign-in attempts"** | Clerk rate-limiting. Wait a few minutes; retrying immediately makes it worse. |
 | **Sign-in fails and mentions Google, Apple or two-factor** | The emailed-code route cannot complete those. Use the paste option in the setup menu. |

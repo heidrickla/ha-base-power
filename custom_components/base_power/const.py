@@ -29,3 +29,17 @@ MIN_SCAN_INTERVAL_SECONDS = 15
 BACKUP_REFERENCE_KW = 0.75
 
 MANUFACTURER = "Base Power"
+
+# The repair issue raised when the battery stops reporting, matching the
+# banner Base's own app shows for the same condition.
+ISSUE_TELEMETRY_UNAVAILABLE = "telemetry_unavailable"
+
+# How long the battery must be silent before the issue is raised. A single
+# quiet poll is not worth a notification - at the default interval a blip
+# would otherwise raise and clear a repair twice a minute - and a fixed COUNT
+# would misbehave at either end of the interval range: ten polls is five
+# minutes at the 30 s default but over an hour and a half at the 3600 s
+# maximum. So the threshold is a DURATION, converted to polls against
+# whatever interval is configured, with at least two polls always required.
+TELEMETRY_GRACE = timedelta(minutes=5)
+MIN_TELEMETRY_POLLS = 2

@@ -26,9 +26,31 @@ Two things that matters for:
   why. A reading of `0 kW` there would have been indistinguishable from a
   house drawing nothing.
 
-The wifi status is the likely explanation and the first thing to check: a
-battery that has lost its network connection cannot report, and Base's own
-app would show the same gap.
+**Base's own app shows the same thing**, in a red banner: "No battery data —
+Your battery is not currently sending data. Don't worry—in the event of a grid
+outage, it will still provide power to your home." So two independent sources
+agree, and one of them is the vendor. That also settles something worth
+stating in the integration: **telemetry loss is not backup loss.** The battery
+still carries the house through an outage while dark, and the entities going
+unavailable must not be read as "no protection".
+
+**The battery does not report over Wi-Fi, so `wifi_status` is not the cause.**
+An earlier draft of this document said to check it; that was wrong, and the
+evidence is in the captures. `BatteryWifiConnectionStatus` distinguishes
+`UNSPECIFIED`, `UNAVAILABLE`, `NOT_CONNECTED`, `CONNECTING` and `CONNECTED`,
+and the strings are separable by length (the prefix is 31 characters, so
+`NOT_CONNECTED` is 44 and `UNAVAILABLE` is 42):
+
+| when | telemetry | `wifi.status` |
+|---|---|---|
+| 02:41, `onGrid` with real power flows | flowing | 44 = `NOT_CONNECTED` |
+| later the same day, `telemetryUnavailable` | absent | 42 = `UNAVAILABLE` (read directly from diagnostics) |
+
+The battery was reporting perfectly well while its Wi-Fi was **not
+connected**, so Wi-Fi is not the telemetry transport. The field moving to
+`UNAVAILABLE` is a second symptom of the same blackout — Base has no current
+information about the unit at all — rather than its cause. The actionable
+advice is Base Support, not the network.
 
 ## Confirmed live, 2026-09-13
 
