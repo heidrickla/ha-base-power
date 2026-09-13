@@ -34,7 +34,17 @@ stating in the integration: **telemetry loss is not backup loss.** The battery
 still carries the house through an outage while dark, and the entities going
 unavailable must not be read as "no protection".
 
-**The battery does not report over Wi-Fi, so `wifi_status` is not the cause.**
+**Telemetry returned the same day**, and the recovery is what proved the
+point below. Measured live at 19:13 UTC: `telemetry_available` true, a current
+`observed_at`, and `wifi_status` reading `NOT_CONNECTED` **at the same time**.
+
+**The battery has a cellular link.** From the owner: *"The battery also has a
+cellular connection they use to connect to the battery when wifi isn't
+working."* That is the mechanism behind every observation here, and it is not
+visible to end users anywhere in the app or the API.
+
+**So `wifi_status` is not a telemetry diagnostic, and must not be presented as
+one.**
 An earlier draft of this document said to check it; that was wrong, and the
 evidence is in the captures. `BatteryWifiConnectionStatus` distinguishes
 `UNSPECIFIED`, `UNAVAILABLE`, `NOT_CONNECTED`, `CONNECTING` and `CONNECTED`,
@@ -46,11 +56,33 @@ and the strings are separable by length (the prefix is 31 characters, so
 | 02:41, `onGrid` with real power flows | flowing | 44 = `NOT_CONNECTED` |
 | later the same day, `telemetryUnavailable` | absent | 42 = `UNAVAILABLE` (read directly from diagnostics) |
 
-The battery was reporting perfectly well while its Wi-Fi was **not
-connected**, so Wi-Fi is not the telemetry transport. The field moving to
-`UNAVAILABLE` is a second symptom of the same blackout — Base has no current
-information about the unit at all — rather than its cause. The actionable
-advice is Base Support, not the network.
+The battery reported perfectly well while its Wi-Fi was **not connected**, on
+two separate occasions either side of the outage, so Wi-Fi is not the
+telemetry transport — the cellular link is. The field moving to `UNAVAILABLE`
+during the gap is a second symptom of the same blackout, not its cause. The
+actionable advice is Base Support, which is exactly what Base's own banner
+says and why its wording is better than the obvious guess.
+
+The enum took two real values in one day, and **neither tells you whether data
+is flowing**, so nothing user-facing should present it as if it did.
+
+## The numbers are real: three cross-checks, 2026-09-13
+
+Once telemetry returned, the readings were checked rather than assumed:
+
+| check | result |
+|---|---|
+| **Power flow balances** | `from_grid` 6.70 + `from_storage` 0.40 = 7.10 kW against `to_home` 7.10 kW — **0.000 kW error**. Three separately parsed fields summing to zero is not something a mis-mapped key survives. |
+| **Stored energy derivation is self-consistent** | derived (hours@750 W × 0.75) = 43.50 kWh; independently, backup-at-current-usage 6.10 h × 7.10 kW = 43.32 kWh. **0.4% apart**, so the 750 W reference assumption holds. |
+| **Against a different vendor's hardware** | Base's `to_home` 7.10 kW vs Emporia whole-panel CTs 6.97 kW — **1.9% apart**. Different vendor, different hardware, different code path, same house. |
+
+That third one is the strongest evidence available that these are real
+measurements rather than plausible-looking garbage, because nothing in this
+integration's code path touches the Emporia figure.
+
+**Still not observed:** a *negative* `from_storage`. It has read positive
+(discharging) throughout, so the charging direction — the reason that sensor
+is signed — remains untested on real data.
 
 ## Confirmed live, 2026-09-13
 

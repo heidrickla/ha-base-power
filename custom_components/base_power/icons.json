@@ -1,0 +1,29 @@
+{
+  "entity": {
+    "sensor": {
+      "power_to_home": { "default": "mdi:home-lightning-bolt" },
+      "power_from_grid": { "default": "mdi:transmission-tower" },
+      "power_from_storage": { "default": "mdi:home-battery" },
+      "power_from_solar": { "default": "mdi:solar-power-variant" },
+      "backup_hours": { "default": "mdi:timer-sand" },
+      "stored_energy": { "default": "mdi:battery-charging-100" },
+      "state_of_charge": { "default": "mdi:battery" },
+      "wifi_ssid": { "default": "mdi:wifi" },
+      "battery_state": {
+        "default": "mdi:battery-unknown",
+        "state": {
+          "on_grid": "mdi:transmission-tower",
+          "off_grid_outage": "mdi:transmission-tower-off",
+          "off_grid_no_home_power": "mdi:home-lightning-bolt-outline",
+          "off_grid_overcurrent": "mdi:flash-alert",
+          "off_grid_overcurrent_standby": "mdi:flash-off",
+          "telemetry_unavailable": "mdi:cloud-question-outline"
+        }
+      }
+    },
+    "binary_sensor": {
+      "grid_outage": { "default": "mdi:transmission-tower-off" },
+      "off_grid": { "default": "mdi:home-battery-outline" }
+    }
+  }
+}

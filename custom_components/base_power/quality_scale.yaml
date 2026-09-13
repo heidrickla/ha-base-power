@@ -165,13 +165,20 @@ rules:
       fixtures captured from the live API. The HA layer itself has NO tests,
       which is what keeps this todo.
 
-      It is however now PROVEN TO LOAD: a real entry on Home Assistant
-      2026.9.2 reached state=loaded with all four platform modules imported
-      and nine entities constructed, so SensorDeviceClass.ENERGY_STORAGE
-      resolves and the ENUM options validate. What is still unobserved is
-      live VALUES - the site was answering telemetry_unavailable at the time,
-      so on_grid, a negative from_storage and the binary sensors reading off
-      have never been seen on real data.
+      It is however now PROVEN TO LOAD AND TO READ CORRECTLY on real data.
+      A real entry on Home Assistant 2026.9.2 reached state=loaded with all
+      four platform modules imported and nine entities constructed, and once
+      the battery resumed reporting the values were cross-checked three ways:
+      the power flow balances to 0.000 kW (from_grid + from_storage =
+      to_home), the stored-energy derivation agrees with the independent
+      backup-at-current-usage figure to 0.4%, and to_home is within 1.9% of a
+      different vendor's whole-panel CTs on the same house. battery_state
+      read on_grid, both binary sensors off, state_of_charge unknown as the
+      on-grid contract requires, and the solar sensor stayed absent.
+
+      One thing remains unobserved: a NEGATIVE from_storage. It has read
+      positive throughout, so the charging direction - the reason that sensor
+      is signed rather than two sensors - is still untested on real data.
 
   # Gold
   devices:
@@ -254,7 +261,12 @@ rules:
       ConfigEntryAuthFailed and UpdateFailed carry f-strings rather than
       translation keys.
   icon-translations:
-    status: todo
+    status: done
+    comment: |
+      icons.json covers every entity, and battery_state carries a per-state
+      icon so the operating state is legible at a glance - a tower for on
+      grid, a struck-through tower for an outage, a flash-alert for
+      overcurrent.
   reconfiguration-flow:
     status: todo
     comment: |

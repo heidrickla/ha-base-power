@@ -135,14 +135,20 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
         self._silent_polls += 1
         if self._telemetry_available is not False:
             self._telemetry_available = False
+            # The battery's Wi-Fi status is deliberately NOT quoted here. It
+            # reads NOT_CONNECTED on a battery that is reporting perfectly
+            # well, because the unit also has a cellular link and uses it when
+            # Wi-Fi is down - so naming it alongside a telemetry fault invites
+            # exactly the wrong action, chasing a network that is not the
+            # transport. Base's own banner never mentions Wi-Fi either.
             _LOGGER.warning(
-                "The Base Power battery is not reporting telemetry (state %s, "
-                "battery Wi-Fi %s). The connection to Base is fine - this poll "
-                "succeeded - so the battery itself is not sending data, and its "
-                "entities are unavailable rather than showing a stale or zero "
-                "reading. Backup during a grid outage is unaffected",
+                "The Base Power battery is not reporting telemetry (state %s). "
+                "The connection to Base is fine - this poll succeeded - so the "
+                "battery itself is not sending data, and its entities are "
+                "unavailable rather than showing a stale or zero reading. "
+                "Backup during a grid outage is unaffected. If it does not "
+                "clear, contact Base Support",
                 snapshot.state,
-                snapshot.wifi_status or "unknown",
             )
 
         if self._silent_polls >= self._silent_polls_before_issue:
