@@ -17,7 +17,10 @@ CONF_ADDRESS_ID = "address_id"
 # 30 s keeps the outage sensor responsive enough to be useful and is the
 # default rather than a limit; the user can raise it.
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
-MIN_SCAN_INTERVAL_SECONDS = 5
+# A floor, not a suggestion. At 5 s a user could issue 17,280 calls a day
+# against Base's production service; 15 s caps it near 5,760 and is still far
+# more responsive than anything the data justifies.
+MIN_SCAN_INTERVAL_SECONDS = 15
 
 # 750 W is the reference load the API reports backup hours against, so
 # hours x 0.75 kW is the stored energy it implies. This is the only route to

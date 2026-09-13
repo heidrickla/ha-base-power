@@ -52,8 +52,6 @@ async def async_setup_entry(
 class BasePowerGridOutage(BasePowerEntity, BinarySensorEntity):
     """On while the API reports the grid down and the battery carrying."""
 
-    entity_description = GRID_OUTAGE
-
     def __init__(self, coordinator, entry) -> None:
         super().__init__(coordinator, entry)
         self.entity_description = GRID_OUTAGE
@@ -73,8 +71,6 @@ class BasePowerOffGrid(BasePowerEntity, BinarySensorEntity):
     reasons that are not "the grid went away", and an automation that wants
     "am I running on battery at all" should not have to enumerate them.
     """
-
-    entity_description = OFF_GRID
 
     def __init__(self, coordinator, entry) -> None:
         super().__init__(coordinator, entry)

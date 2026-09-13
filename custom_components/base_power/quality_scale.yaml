@@ -1,0 +1,251 @@
+# Honest status, not aspirational. This integration is new, and the whole HA
+# layer has never been imported by a running Home Assistant - so anything that
+# can only be proven by execution is `todo`, not `done`. The manifest
+# deliberately declares no quality_scale key: a custom integration does not
+# get a badge, and claiming one here would be the same mistake as marking
+# these rules done because the code looks right.
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: |
+      No actions of its own. The two control methods the API exposes
+      (StartManualBackup, ResetOvercurrent) act on real hardware and are
+      deliberately not wired to anything yet.
+  appropriate-polling:
+    status: done
+    comment: |
+      Thirty seconds, chosen against evidence rather than taste. The app's
+      own refetchInterval is 1000 ms, read out of the bundle, but React Query
+      only refetches while its screen is mounted and focused - a burst while
+      somebody watches, not a standing load. A 24/7 poller at that rate would
+      be 86,400 calls a day against Base's production service. 30 s is ~2,880
+      and still responsive enough for the outage sensor, which is the point
+      of the integration. The floor on the user-configurable interval is 15 s
+      for the same reason.
+  brands:
+    status: todo
+    comment: |
+      No brand images yet. Base Power is not in home-assistant/brands.
+  common-modules:
+    status: done
+    comment: |
+      coordinator.py holds the coordinator, entity.py the base every entity
+      shares (device info, availability rule), so the two platforms differ
+      only in what they read off the snapshot.
+  config-flow-test-coverage:
+    status: todo
+    comment: |
+      No config-flow tests. They need a Home Assistant test harness, which
+      does not install on the Windows host this was built on - Home Assistant
+      requires fcntl. This is the largest single gap.
+  config-flow:
+    status: done
+    comment: |
+      A single-step flow taking the Clerk client credential, which is
+      validated by a real ListLocations call before the entry is created; the
+      site is discovered from that response rather than typed. Sign-in itself
+      is passwordless (emailed code or social), so there is no username and
+      password to collect.
+  dependency-transparency:
+    status: done
+    comment: |
+      No requirements at all. The API is Connect RPC, whose JSON codec means
+      no protobuf runtime is needed, and the client is built on the aiohttp
+      session Home Assistant provides.
+  docs-actions:
+    status: exempt
+    comment: No actions.
+  docs-conditions:
+    status: exempt
+    comment: No conditions.
+  docs-high-level-description:
+    status: done
+    comment: README.md says what it is and what it talks to.
+  docs-installation-instructions:
+    status: todo
+    comment: |
+      README covers what the integration is, not yet how to install it. The
+      credential-copying step in particular needs writing up for someone who
+      has not read docs/API.md.
+  docs-removal-instructions:
+    status: todo
+  docs-triggers:
+    status: exempt
+    comment: No triggers.
+  entity-event-setup:
+    status: exempt
+    comment: |
+      Nothing subscribes to events: the coordinator polls and entities read
+      from it.
+  entity-unique-id:
+    status: done
+    comment: |
+      Every entity is `<address_id>_<key>`, and the address id is the
+      identifier the whole API is scoped by.
+  has-entity-name:
+    status: done
+  runtime-data:
+    status: done
+    comment: |
+      The coordinator lives on entry.runtime_data, typed through
+      BasePowerConfigEntry.
+  test-before-configure:
+    status: done
+    comment: |
+      The config flow calls ListLocations before creating the entry, so a bad
+      credential or an unreachable API is reported in the form rather than as
+      a broken entry.
+  test-before-setup:
+    status: done
+    comment: |
+      async_config_entry_first_refresh, and a rejected credential raises
+      ConfigEntryAuthFailed into the reauth flow.
+  unique-config-entry:
+    status: done
+    comment: The address id is the unique id, so a site cannot be added twice.
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: No actions.
+  config-entry-unloading:
+    status: done
+  docs-configuration-parameters:
+    status: todo
+    comment: The options flow has one parameter; it is not documented yet.
+  docs-installation-parameters:
+    status: todo
+  entity-unavailable:
+    status: done
+    comment: |
+      Entities go unavailable when the poll fails and when the API answers
+      telemetry_unavailable - the service saying it has no current reading.
+      Holding the last value through either would show a stale number as
+      current. The battery_state sensor is the deliberate exception: its job
+      is to say why the others went away.
+  integration-owner:
+    status: done
+  log-when-unavailable:
+    status: todo
+    comment: |
+      The coordinator relies on DataUpdateCoordinator's own logging. A
+      once-per-outage line naming the cause has not been added.
+  parallel-updates:
+    status: done
+    comment: |
+      PARALLEL_UPDATES = 0 on both platforms: everything is read from the
+      coordinator and nothing calls the API per entity.
+  reauthentication-flow:
+    status: done
+    comment: |
+      A Clerk session can end or be revoked, which is the expected way this
+      breaks, so async_step_reauth takes a fresh credential and validates it
+      before storing.
+  test-coverage:
+    status: todo
+    comment: |
+      41 tests cover the pure layer - the snapshot state union, the power
+      flow's None-vs-zero distinction, capability parsing, error mapping and
+      diagnostics redaction - including fixtures captured from the live API.
+      The HA layer has NO tests and has never been imported by a running
+      Home Assistant. That is the honest state.
+
+  # Gold
+  devices:
+    status: done
+    comment: One device per site.
+  diagnostics:
+    status: done
+    comment: |
+      Credentials are absent rather than masked, the address id appears only
+      as a digest, and the Wi-Fi SSID never appears; the snapshot dataclass
+      keeps no raw response, so there is none to leak. Pinned by tests.
+  discovery-update-info:
+    status: exempt
+    comment: Cloud service, nothing to discover on the network.
+  discovery:
+    status: exempt
+    comment: |
+      The API is reached over the internet and scoped by an account
+      credential; there is nothing discoverable.
+  docs-data-update:
+    status: todo
+  docs-examples:
+    status: todo
+  docs-known-limitations:
+    status: done
+    comment: |
+      docs/API.md is explicit about them: no state of charge while on grid,
+      UsageService returning no samples for the site tested, and the HA layer
+      being unverified by execution.
+  docs-supported-devices:
+    status: todo
+  docs-supported-functions:
+    status: done
+    comment: README lists the entities and says which are deliberately absent.
+  docs-troubleshooting:
+    status: todo
+  docs-use-cases:
+    status: todo
+  dynamic-devices:
+    status: exempt
+    comment: |
+      A site's battery does not come and go; a second site is a second entry.
+  entity-category:
+    status: done
+    comment: |
+      The Wi-Fi SSID sensor is DIAGNOSTIC and disabled by default. The power
+      and state entities are primary.
+  entity-device-class:
+    status: done
+    comment: |
+      POWER, ENERGY_STORAGE, BATTERY, DURATION and ENUM on the sensors;
+      PROBLEM on both binary sensors.
+  entity-disabled-by-default:
+    status: done
+    comment: The Wi-Fi SSID sensor, which is rarely wanted.
+  entity-translations:
+    status: done
+    comment: |
+      Every entity has a translation key, and battery_state translates its
+      states. "unknown" is deliberately NOT among the ENUM options: it is a
+      reserved Home Assistant state, so the decoder's unknown maps to None.
+  exception-translations:
+    status: todo
+    comment: |
+      ConfigEntryAuthFailed and UpdateFailed carry f-strings rather than
+      translation keys.
+  icon-translations:
+    status: todo
+  reconfiguration-flow:
+    status: todo
+    comment: |
+      Only reauth exists. There is nothing else to reconfigure yet - the
+      address is discovered, not entered.
+  repair-issues:
+    status: exempt
+    comment: |
+      The one actionable failure is the credential expiring, which is a
+      reauth flow rather than a repair.
+  stale-devices:
+    status: exempt
+    comment: One device per entry; removing the entry removes it.
+
+  # Platinum
+  async-dependency:
+    status: done
+    comment: |
+      No dependency at all: the client is async over Home Assistant's own
+      aiohttp session.
+  inject-websession:
+    status: done
+    comment: |
+      async_get_clientsession throughout - the client, the config flow and
+      the Clerk provider all take the shared session.
+  strict-typing:
+    status: todo
+    comment: |
+      The modules are annotated but mypy --strict has not been run, because
+      Home Assistant is not installable on the host this was built on and
+      its stubs are what the HA-facing signatures would be checked against.

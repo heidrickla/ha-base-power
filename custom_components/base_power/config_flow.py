@@ -13,10 +13,15 @@ discovered rather than typed: `ListLocations` is the call that yields the
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlowWithReload,
+)
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -80,7 +85,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(step_id="user", data_schema=STEP_USER, errors=errors)
 
-    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         """The credential died - a Clerk session ends or is revoked."""
         return await self.async_step_reauth_confirm()
 
@@ -110,12 +115,17 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(entry: BasePowerConfigEntry) -> OptionsFlow:
+    def async_get_options_flow(entry: BasePowerConfigEntry) -> OptionsFlowWithReload:
         return BasePowerOptionsFlow()
 
 
-class BasePowerOptionsFlow(OptionsFlow):
-    """Just the poll interval."""
+class BasePowerOptionsFlow(OptionsFlowWithReload):
+    """Just the poll interval.
+
+    OptionsFlowWithReload reloads the entry itself when options change, which
+    is why __init__.py registers no update listener: doing both would reload
+    twice for one edit.
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

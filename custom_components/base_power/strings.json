@@ -55,8 +55,7 @@
           "off_grid_no_home_power": "Off grid, no home power",
           "off_grid_overcurrent": "Off grid, overcurrent",
           "off_grid_overcurrent_standby": "Off grid, overcurrent standby",
-          "telemetry_unavailable": "Telemetry unavailable",
-          "unknown": "Unknown"
+          "telemetry_unavailable": "Telemetry unavailable"
         }
       }
     },

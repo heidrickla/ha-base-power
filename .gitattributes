@@ -1,0 +1,27 @@
+# Normalise to LF in the repository and in the working tree.
+#
+# Authoring happens on Windows; anything that runs does so on Linux (the HA OS
+# VM, the forge's runners). A CRLF checkout of a shell script or a YAML document
+# is a different file to every consumer that matters, and the difference is
+# invisible in an editor.
+#
+# Today the blobs are already clean - `git cat-file blob` reports zero CR bytes
+# across every tracked file - because core.autocrlf is set on this clone. That
+# is a local setting on one machine, which is exactly why it should not be what
+# the repository depends on.
+
+* text=auto eol=lf
+
+*.py    text eol=lf
+*.sh    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.proto text eol=lf
+
+# Never touched.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.apk binary

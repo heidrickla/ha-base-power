@@ -115,6 +115,12 @@ SENSORS: tuple[BasePowerSensorDescription, ...] = (
         key="battery_state",
         translation_key="battery_state",
         device_class=SensorDeviceClass.ENUM,
+        # "unknown" is NOT in this list on purpose. It is a reserved Home
+        # Assistant state, and an ENUM sensor whose value is the literal
+        # string "unknown" is indistinguishable from having no value - Home
+        # Assistant validates options against the reserved words and would
+        # reject it. The decoder's "unknown" state maps to None below, which
+        # renders as unknown anyway, so nothing is lost but the collision.
         options=[
             "on_grid",
             "off_grid_outage",
@@ -122,9 +128,8 @@ SENSORS: tuple[BasePowerSensorDescription, ...] = (
             "off_grid_overcurrent",
             "off_grid_overcurrent_standby",
             "telemetry_unavailable",
-            "unknown",
         ],
-        value_fn=lambda s: s.state,
+        value_fn=lambda s: None if s.state == "unknown" else s.state,
     ),
     # Only populated while off grid; the API does not publish it on grid.
     BasePowerSensorDescription(
@@ -189,7 +194,15 @@ class BasePowerSensor(BasePowerEntity, SensorEntity):
         Every other sensor goes unavailable with the telemetry, because it
         has nothing to report. This one's whole job is to say WHY, so taking
         it away at that moment would hide the answer.
+
+        Written out rather than as `super(BasePowerEntity, self).available`:
+        that form was correct, but only because CoordinatorEntity happens to
+        be next in the MRO, and it would change meaning silently if anyone
+        inserted a mixin. Saying the condition is saying what is meant.
         """
         if self.entity_description.key == "battery_state":
-            return super(BasePowerEntity, self).available and self.coordinator.snapshot is not None
+            return (
+                self.coordinator.last_update_success
+                and self.coordinator.snapshot is not None
+            )
         return super().available
