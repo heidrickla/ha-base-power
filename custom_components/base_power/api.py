@@ -158,8 +158,8 @@ class BatterySnapshot:
 
         The response nests the union under `snapshot`, but callers hand either
         the outer or the inner object, so accept both. An unrecognised variant
-        becomes `unknown` rather than raising: a shape never observed live must
-        degrade to "I do not know", not take the integration down.
+        becomes `unknown` rather than raising, so an unfamiliar shape degrades
+        to "I do not know" instead of taking the integration down.
         """
         nested = data.get("snapshot")
         snapshot = nested if isinstance(nested, dict) else data

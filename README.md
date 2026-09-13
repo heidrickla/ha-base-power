@@ -28,13 +28,13 @@ independent backup-at-current-usage figure to 0.4%. And `to_home` lands within
 strongest evidence available that these are measurements rather than
 plausible-looking garbage: nothing in this code path touches that figure.
 
-Not yet observed:
+Unobserved as of 2026-09-13, and what would close each:
 
-| Not seen | Why |
+| Unobserved | What closes it |
 |---|---|
-| The off-grid states, and State of charge with a value | Needs a real grid outage. `on_grid` is confirmed. |
-| Power from solar | The test site has no solar, so Base omits the field. |
-| `UsageService` samples | Both methods answer and return empty for this site. Cause unknown. |
+| The off-grid states, and State of charge with a value | A real grid outage. `on_grid` is confirmed. |
+| Power from solar | A site that declares solar. The test site has none, so Base omits the field. |
+| `UsageService` samples | Opening the usage screen in the Base app: if it shows history, the fault is in this client. Both methods answer and return empty for this site. |
 
 Statements in `docs/API.md` marked unconfirmed remain readings of the app
 binary.
@@ -54,8 +54,10 @@ short-lived tokens from it, the same way the mobile app does.
 A second menu option, "paste a credential", covers what the code route cannot:
 an account that signs in only with Google or Apple, an account with two-factor
 authentication, or a change at Clerk that breaks the code flow. It takes the
-`__client` cookie from a browser session, described in `docs/API.md`. That
-path has not been run against the live service; the code path has.
+`__client` cookie from a browser session, described in `docs/API.md`. The
+emailed-code path completed against the live service on 2026-09-13; the paste
+path is untested as of that date, and the first Google or Apple account to use
+it is the test.
 
 ## Supported devices
 

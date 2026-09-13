@@ -291,13 +291,17 @@ empty, the data is not there for this site.
 
 ### Smaller open questions
 
+Each is dated, with what would close it, so staleness is visible rather than
+silent.
+
 - How long a `__client` credential lasts before Clerk ends the session.
-  Unknown, so the integration raises a reauth flow rather than assuming.
-- `GetDailyEnergy` has never been called. It takes a service period, so a
+  Unknown as of 2026-09-13; the first reauth prompt in normal service answers
+  it. The integration raises a reauth flow rather than assuming a lifetime.
+- `GetDailyEnergy`, uncalled as of 2026-09-13. It takes a service period, so a
   window has to be chosen first. It is the route to the energy dashboard.
-- The two control methods have never been exercised. `StartManualBackup` and
-  `ResetOvercurrent` act on real hardware, the probe refuses them by
-  allowlist, and no entity exposes them. Testing them is the owner's call.
+- `StartManualBackup` and `ResetOvercurrent`, unexercised as of 2026-09-13.
+  Both act on real hardware, the probe refuses them by allowlist, and no
+  entity exposes them. Only the owner running one deliberately closes this.
 
 ## Where the source artefacts are kept
 
