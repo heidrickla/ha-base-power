@@ -101,24 +101,48 @@ def make_icon(master: int = 1024) -> Image.Image:
     return draw_battery(master)
 
 
+def _fit(draw, text_parts, box_w, start_px, min_px=8):
+    """Largest font size at which the parts fit box_w on one line.
+
+    The first attempt overflowed and clipped to "Base Pow" - measuring is the
+    fix, not guessing a smaller constant, because the answer depends on which
+    font actually loaded and that varies by machine.
+    """
+    px = start_px
+    while px > min_px:
+        f = _font(px)
+        total = sum(draw.textlength(t, font=f) for t in text_parts)
+        total += draw.textlength(" ", font=f) * (len(text_parts) - 1)
+        if total <= box_w:
+            return f, total
+        px -= 2
+    return _font(min_px), box_w
+
+
 def make_logo(dark: bool = False, master_h: int = 512) -> Image.Image:
     """Device on the left, product name on the right, at 2:1."""
     w, h = master_h * 2, master_h
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    mark = draw_battery(int(h * 0.94)).resize(
-        (int(h * 0.94), int(h * 0.94)), Image.LANCZOS)
-    img.alpha_composite(mark, (int(h * 0.02), int(h * 0.03)))
+    mark_px = int(h * 0.92)
+    mark = draw_battery(mark_px)
+    img.alpha_composite(mark, (int(h * 0.03), int(h * 0.04)))
 
     d = ImageDraw.Draw(img)
     fg = (255, 255, 255, 255) if dark else SLATE
-    f1 = _font(int(h * 0.235))
-    f2 = _font(int(h * 0.155))
-    tx = int(h * 1.00)
-    d.text((tx, int(h * 0.30)), "Base", font=f1, fill=fg)
-    bb = d.textbbox((tx, int(h * 0.30)), "Base", font=f1)
-    d.text((bb[2] + int(h * 0.05), int(h * 0.335)), "Power", font=f1, fill=ENERGY)
-    d.text((tx, int(h * 0.575)), "HOME BATTERY", font=f2,
-           fill=(fg[0], fg[1], fg[2], 165))
+    tx = int(h * 0.03) + mark_px + int(h * 0.06)
+    avail = w - tx - int(h * 0.06)
+
+    f1, _ = _fit(d, ["Base", "Power"], avail, int(h * 0.26))
+    gap = d.textlength(" ", font=f1)
+    y1 = int(h * 0.28)
+    d.text((tx, y1), "Base", font=f1, fill=fg)
+    d.text((tx + d.textlength("Base", font=f1) + gap, y1), "Power",
+           font=f1, fill=ENERGY)
+
+    sub = "HOME BATTERY"
+    f2, _ = _fit(d, [sub], avail, int(h * 0.14))
+    d.text((tx, y1 + int(f1.size * 1.18)), sub, font=f2,
+           fill=(fg[0], fg[1], fg[2], 170))
     return img
 
 
