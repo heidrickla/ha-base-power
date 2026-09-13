@@ -256,10 +256,18 @@ rules:
       states. "unknown" is deliberately NOT among the ENUM options: it is a
       reserved Home Assistant state, so the decoder's unknown maps to None.
   exception-translations:
-    status: todo
+    status: done
     comment: |
-      ConfigEntryAuthFailed and UpdateFailed carry f-strings rather than
-      translation keys.
+      ConfigEntryAuthFailed and UpdateFailed are raised with
+      translation_domain and translation_key rather than f-strings, so the
+      text a user sees on the integration card is translatable and the
+      underlying error arrives as a placeholder.
+
+      validate_local.py enforces the three ways this drifts silently: a key
+      raised but not declared renders as the bare key, a key declared but
+      never raised is dead text, and a placeholder no raise site supplies is
+      a KeyError inside Home Assistant's own formatting. Each half was proven
+      to fail on a deliberately broken copy rather than assumed to work.
   icon-translations:
     status: done
     comment: |

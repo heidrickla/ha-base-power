@@ -51,6 +51,14 @@
       "reauth_successful": "Base Power was signed in again."
     }
   },
+  "exceptions": {
+    "auth_failed": {
+      "message": "Base Power rejected the stored credential, so Home Assistant has been signed out. Sign in again to reconnect. ({error})"
+    },
+    "api_error": {
+      "message": "Could not read the battery from Base Power: {error}"
+    }
+  },
   "issues": {
     "telemetry_unavailable": {
       "title": "{name} is not sending data",

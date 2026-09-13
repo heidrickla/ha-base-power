@@ -107,9 +107,16 @@ def main() -> int:
     for domain_block in (strings.get("entity") or {}).values():
         declared.update(domain_block.keys())
 
+    # Entity keys only: anything raised with a translation_domain is an
+    # exception or a repair issue and is checked further down instead.
     used: set[str] = set()
     for py in COMPONENT.glob("*.py"):
-        used.update(re.findall(r'translation_key="([^"]+)"', py.read_text(encoding="utf-8")))
+        src = py.read_text(encoding="utf-8")
+        all_keys = set(re.findall(r'translation_key="([^"]+)"', src))
+        raised_keys = set(
+            re.findall(r'translation_domain=[^,]+,\s*translation_key="([a-z_]+)"', src)
+        )
+        used.update(all_keys - raised_keys)
     missing_strings = used - declared
     unused_strings = declared - used
     check(not missing_strings, f"translation keys used but not in strings.json: {sorted(missing_strings)}")
@@ -165,6 +172,42 @@ def main() -> int:
         done = sum(1 for v in listed.values() if v == "done")
         todo = sum(1 for v in listed.values() if v == "todo")
         notes.append(f"quality scale: {done} done, {todo} todo, {len(listed) - done - todo} exempt")
+
+    # --------------------------------------------- exception translations
+    # Three ways this drifts, all silent at runtime: a key raised but never
+    # declared renders as the bare key, a key declared but never raised is
+    # dead text, and a placeholder in the message that no raise site supplies
+    # produces a KeyError inside Home Assistant's own formatting.
+    # Scoped by CONTEXT, not by name: an exception or a repair issue is
+    # raised with translation_domain alongside the key, and an entity
+    # description never is. Matching on the key alone would make each check
+    # see the other's keys and fail on both.
+    declared_exceptions = set(strings.get("exceptions") or {})
+    translated_raises: set[str] = set()
+    for py in COMPONENT.glob("*.py"):
+        src = py.read_text(encoding="utf-8")
+        translated_raises.update(
+            re.findall(
+                r"translation_domain=[^,]+,\s*translation_key=\"([a-z_]+)\"", src
+            )
+        )
+    # The repair issue uses the same shape but lives under "issues".
+    raised = translated_raises - set(strings.get("issues") or {})
+    check(
+        not (raised - declared_exceptions),
+        f"exceptions raised but not in strings.json: {sorted(raised - declared_exceptions)}",
+    )
+    check(
+        not (declared_exceptions - raised),
+        f"strings.json declares exceptions nothing raises: {sorted(declared_exceptions - raised)}",
+    )
+    all_source = "\n".join(p.read_text(encoding="utf-8") for p in COMPONENT.glob("*.py"))
+    for key, entry in (strings.get("exceptions") or {}).items():
+        for placeholder in re.findall(r"\{(\w+)\}", entry.get("message", "")):
+            check(
+                f'"{placeholder}"' in all_source,
+                f"exception {key} uses placeholder {placeholder!r} that no raise site supplies",
+            )
 
     # ------------------------------------------------- diagnostics redaction
     diag = COMPONENT / "diagnostics.py"

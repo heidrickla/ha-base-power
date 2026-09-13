@@ -188,12 +188,22 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
                 return snapshot
             except (BasePowerAuthError, ClerkAuthError) as retry_err:
                 raise ConfigEntryAuthFailed(
-                    f"Base Power rejected the stored credential: {retry_err}"
+                    translation_domain=DOMAIN,
+                    translation_key="auth_failed",
+                    translation_placeholders={"error": str(retry_err)},
                 ) from retry_err
         except ClerkAuthError as err:
-            raise ConfigEntryAuthFailed(str(err)) from err
+            raise ConfigEntryAuthFailed(
+                translation_domain=DOMAIN,
+                translation_key="auth_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
         except BasePowerError as err:
-            raise UpdateFailed(f"Base Power API error: {err}") from err
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="api_error",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
     @property
     def snapshot(self) -> BatterySnapshot | None:
