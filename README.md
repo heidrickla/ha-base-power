@@ -15,29 +15,18 @@ which is React Native on Hermes and talks Connect RPC to
 - [tools/decode_descriptors.py](tools/decode_descriptors.py): recovers those
   files from a Hermes bundle's string table.
 
-## Status
+## Accuracy
 
-Running on Home Assistant 2026.9.2 since 2026-09-13. Sign-in, `ListLocations`,
-`GetLocation` and `GetSnapshot` all confirmed against the live service.
+Three cross-checks on one installation:
 
-The numbers are cross-checked three ways rather than assumed. The power flow
-balances to 0.000 kW (`from_grid` + `from_storage` = `to_home`, three
-separately parsed fields). The stored-energy derivation agrees with the
-independent backup-at-current-usage figure to 0.4%. And `to_home` lands within
-1.9% of a different vendor's whole-panel CTs on the same house, which is the
-strongest evidence available that these are measurements rather than
-plausible-looking garbage: nothing in this code path touches that figure.
-
-Unobserved as of 2026-09-13, and what would close each:
-
-| Unobserved | What closes it |
+| Check | Result |
 |---|---|
-| The off-grid states, and State of charge with a value | A real grid outage. `on_grid` is confirmed. |
-| Power from solar | A site that declares solar. The test site has none, so Base omits the field. |
-| `UsageService` samples | Opening the usage screen in the Base app: if it shows history, the fault is in this client. Both methods answer and return empty for this site. |
+| Power flow balance | `from_grid` + `from_storage` = `to_home` to 0.000 kW, three separately parsed fields |
+| Stored energy | The 750 W-reference derivation agrees with the backup-at-current-usage figure to 0.4% |
+| Another vendor | `to_home` within 1.9% of a whole-panel CT monitor on the same house, which shares no code path with this integration |
 
-Statements in `docs/API.md` marked unconfirmed remain readings of the app
-binary.
+`docs/API.md` separates what the live service returned from what was read out
+of the app binary.
 
 ## Setting it up
 
@@ -54,10 +43,7 @@ short-lived tokens from it, the same way the mobile app does.
 A second menu option, "paste a credential", covers what the code route cannot:
 an account that signs in only with Google or Apple, an account with two-factor
 authentication, or a change at Clerk that breaks the code flow. It takes the
-`__client` cookie from a browser session, described in `docs/API.md`. The
-emailed-code path completed against the live service on 2026-09-13; the paste
-path is untested as of that date, and the first Google or Apple account to use
-it is the test.
+`__client` cookie from a browser session, described in `docs/API.md`.
 
 ## Supported devices
 
@@ -118,12 +104,11 @@ reading. Holding the last value through either would show a stale number as
 current. Battery state is the deliberate exception: it stays available to say
 why the others went away.
 
-### Expect gaps, and check the Wi-Fi first
+### Reporting gaps and the Wi-Fi link
 
 The battery has its own reporting cadence, separate from the poll interval,
 and Home Assistant cannot speed it up. It reports over Wi-Fi when it can and
-falls back to cellular when it cannot. Both measured on the same healthy
-battery on the same day:
+falls back to cellular when it cannot. Measured on one battery:
 
 | Link | Between observations |
 |---|---|
@@ -132,25 +117,23 @@ battery on the same day:
 
 Base drops a snapshot once it goes stale rather than serving an old one, so on
 cellular `telemetry_unavailable` comes and goes in ordinary service and
-entities drop out for a few minutes at a time. On Wi-Fi that essentially does
-not happen.
+entities drop out for a few minutes at a time. At the Wi-Fi cadence they do
+not.
 
-Repeated gaps are therefore a signal: they usually mean the battery has fallen
-back to cellular. That is what the Battery Wi-Fi network diagnostic is for.
-Enable it, and if it reads anything but connected, check the access point the
-battery associates with rather than the battery. Diagnosed that way once: an
-AP whose PoE injector had been unplugged on the ethernet side, so the AP
-looked powered while the battery had no path. It fell back to cellular and
-Base's own app showed "No battery data" for most of a day.
+Repeated gaps usually mean the battery has fallen back to cellular. Enable the
+Battery Wi-Fi network diagnostic; if it reads anything but connected, check
+the access point the battery associates with. An access point whose PoE
+injector is unplugged on the Ethernet side looks powered while carrying no
+traffic, and Base's own app then shows "No battery data".
 
-Polling faster does not help. It only asks more often for data the battery has
-not sent. An automation or template sensor can hold the last value if the gaps
-bother you; this integration will not, because a stale kW figure is
-indistinguishable from a real one.
+Polling faster does not help: it asks more often for data the battery has not
+sent. An automation or template sensor can hold the last value; this
+integration does not, because a stale kW figure is indistinguishable from a
+real one.
 
-A repair notice appears after 30 minutes without telemetry. That clears even
-the cellular cadence, so on Wi-Fi it should never fire, and it is short enough
-to catch a battery that has genuinely stopped.
+A repair notice appears after 30 minutes without telemetry. That is longer
+than the cellular cadence and short enough to catch a battery that has stopped
+reporting.
 
 ## Configuration
 

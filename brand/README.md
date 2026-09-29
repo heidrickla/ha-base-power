@@ -12,9 +12,8 @@ Two traps, each of which looks exactly like the feature not existing:
 
 The proxy path is `/api/brands/integration/<domain>/<file>`. That middle
 `integration/` segment is required; `/api/brands/<domain>/...` returns 404.
-Verified 2026-09-13 against HA 2026.9.2 by comparing byte counts: the proxy
-returned 6939 bytes for `base_power/icon.png`, matching this repo's file
-exactly, and likewise for `tuxedo_touch` and `glkvm`.
+The proxy serves this repo's file byte for byte: 6939 bytes for
+`base_power/icon.png`.
 
 Do not test against `brands.home-assistant.io` and read the status code. That
 CDN never 404s for an unknown domain. It answers HTTP 200 with a 3039-byte

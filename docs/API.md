@@ -2,15 +2,14 @@
 
 Read out of the shipped Android app, not from documentation. Recovered from
 Base Power 1.14.0 (versionCode 87), package
-`com.basepowercompany.basemobileapp`, pulled from a Pixel over ADB on
-2026-09-13.
+`com.basepowercompany.basemobileapp`, pulled from a phone over ADB.
 
-Confirmed live on 2026-09-13, read-only, via `tools/live_probe.py`: the
+Measured against the live service, read-only, with `tools/live_probe.py`: the
 transport, the auth flow, `LocationsService/ListLocations`,
-`LocationsService/GetLocation` and `BatteryService/GetSnapshot`. The emailed
-code sign-in has since been completed end to end by a real user. Anything not
-marked confirmed is a reading of the binary rather than a measurement, and
-says so.
+`LocationsService/GetLocation` and `BatteryService/GetSnapshot`, and the
+emailed-code sign-in end to end. [What the live calls
+returned](#what-the-live-calls-returned) and [Findings](#findings-that-shape-the-integration)
+are measurements; the rest is read from the binary.
 
 ## Transport
 
@@ -57,7 +56,7 @@ No custom JWT template is used. Clerk's `getToken()` accepts
 `template` in the bundle are that generic options object and Expo's icon
 `renderingMode: 'template'`. The API accepts a plain Clerk session token.
 
-### Two tokens, and the difference decides the design
+### Two tokens
 
 | cookie | lifetime | use |
 |---|---|---|
@@ -66,7 +65,8 @@ No custom JWT template is used. Clerk's `getToken()` accepts
 
 The integration stores the client credential and mints a session token per
 poll, caching each until close to expiry. That is what `BasePowerClient`'s
-`token_provider` callable exists for.
+`token_provider` callable exists for. When Clerk ends the session the
+integration starts reauthentication; it assumes no credential lifetime.
 
 ### The sign-in sequence
 
@@ -101,10 +101,9 @@ Native is the better side for a headless integration. The browser flow
 additionally needs an `Origin` and a browser `User-Agent`: a request identical
 but for the UA is refused 403 as `Python-urllib`.
 
-Three further things Clerk's frontend API requires, each learned by being
-refused without it: the path is `GET /v1/client`, not `/v1/client/sync`; the
-API-version query parameters must be present; and `Origin` and `Authorization`
-must never both be sent.
+Clerk's frontend API also requires: the path `GET /v1/client`, not
+`/v1/client/sync`; the API-version query parameters; and never both `Origin`
+and `Authorization` on one request.
 
 ## Services and methods
 
@@ -120,6 +119,10 @@ All under `dashboard.mobile.v2`. Every request naming a site takes
 | `StartManualBackup` | `address_id` | `BatteryControlAccepted` |
 | `ListWifiNetworks` | `address_id` | networks + `observed_at` |
 | `ConnectWifi` | `address_id`, `ssid`, `password` | `BatteryControlAccepted` |
+
+`ResetOvercurrent` and `StartManualBackup` act on the hardware. No entity
+exposes them, and `tools/live_probe.py` refuses every method outside its
+read-only allowlist.
 
 `BatterySnapshot` is a oneof-style state union. Exactly one of these is
 populated, and which one is the battery's operating state:
@@ -156,6 +159,13 @@ The populated variant carries:
 `DailyEnergyCost`: `grid_energy_cents`,
 `solar_self_consumption_savings_cents`, `solar_export_credit_cents`.
 
+The bundle has two `getRecentPower`s. The first is the app's mock
+(`useMockContext` / `isMock`), which manufactures samples with `Math.sin` over
+`Array.from({length})`. The real client (function #40185, the same shape for
+`getRecentGridVoltage` and `getDailyEnergy`) calls
+`client.getRecentPower({ addressId })` and maps `samples`, with no time window
+and no extra field. This integration calls it the same way.
+
 ### LocationsService
 
 `ListLocations` and `GetLocation`. A `Location` carries `summary`, `energy`,
@@ -180,133 +190,70 @@ The populated variant carries:
   `fromStorageKw` -0.3, `nonSolarToHomeKw` 2.6, `toHomeKw` 2.6, plus
   `estimatedBackupHoursAtCurrentUsage`, `estimatedBackupHoursAt750Watts` and a
   `wifi` block.
+- `GetRecentPower` and `GetRecentGridVoltage` 200 with an empty body. proto3
+  JSON omits empty repeated fields, so `{}` means `samples` is empty, not a
+  failed call. No sensor is built on them.
 
-### The numbers are real: three cross-checks
+### Cross-checks
 
 | check | result |
 |---|---|
-| Power flow balances | `from_grid` 6.70 + `from_storage` 0.40 = 7.10 kW against `to_home` 7.10 kW. Zero error. Three separately parsed fields summing exactly is not something a mis-mapped key survives. |
+| Power flow balances | `from_grid` 6.70 + `from_storage` 0.40 = 7.10 kW against `to_home` 7.10 kW. Zero error across three separately parsed fields, which a mis-mapped key does not survive. |
 | Stored energy derivation is self-consistent | derived (hours at 750 W times 0.75) = 43.50 kWh; independently, backup-at-current-usage 6.10 h times 7.10 kW = 43.32 kWh. 0.4% apart, so the 750 W reference assumption holds. |
 | Against a different vendor | Base's `to_home` 7.10 kW against Emporia whole-panel CTs 6.97 kW, 1.9% apart. Different vendor, hardware and code path, same house. |
-
-The third is the strongest evidence available that these are measurements
-rather than plausible-looking garbage, because nothing in this code path
-touches the Emporia figure.
 
 ## Findings that shape the integration
 
 ### `on_grid` carries no `state_of_energy_percent`
 
-The descriptor implied it
-and the live response confirms it: state of charge is published only in the
-off-grid variants. A state-of-charge sensor cannot be fed from `GetSnapshot`
-in the normal case. `estimated_backup_hours_at_750_watts` is the usable proxy
-for stored energy: 59.33 h at 0.75 kW is about 44.5 kWh.
+The descriptor implies it and the live response shows it: state of charge is
+published only in the off-grid variants. A state-of-charge sensor cannot be
+fed from `GetSnapshot` in the normal case. `estimated_backup_hours_at_750_watts`
+is the usable proxy for stored energy: 59.33 h at 0.75 kW is about 44.5 kWh.
 
 ### `from_storage_kw` is signed
 
-The live value was -0.3, the battery charging
-from grid. Direction is in the sign, so it must not be clamped. A negative
-value has been confirmed both on the wire and through a Home Assistant sensor.
+The live value was -0.3, the battery charging from grid. Direction is in the
+sign, so it must not be clamped. The negative value reads the same on the wire
+and through the Home Assistant sensor.
 
 ### Absent fields are absent, not zero
 
-The site has no solar and
-`from_solar_kw` was omitted entirely rather than sent as 0.0. proto3 also
-omits false booleans, so a missing `hasSolar` in `capabilities` means no
-solar, which is why `LocationCapabilities` defaults to False rather than None.
+On a site with no solar, `from_solar_kw` is omitted entirely rather than sent
+as 0.0. proto3 also omits false booleans, so a missing `hasSolar` in
+`capabilities` means no solar, which is why `LocationCapabilities` defaults to
+False rather than None.
 
 ### `wifi_status` says which cadence to expect, not whether data is flowing
 
-`telemetry_available` is the field for whether data is current. The Wi-Fi field is still worth reading, because the battery
-reports over Wi-Fi when it can and falls back to cellular when it cannot, and
-those cadences differ by an order of magnitude. `BatteryWifiConnectionStatus`
-distinguishes `UNSPECIFIED`, `UNAVAILABLE`, `NOT_CONNECTED`, `CONNECTING` and
-`CONNECTED`.
+`telemetry_available` is the field for whether data is current. The Wi-Fi
+field says which link the battery reports over: Wi-Fi when it can, cellular
+when it cannot, and the two cadences differ by an order of magnitude.
+`BatteryWifiConnectionStatus` distinguishes `UNSPECIFIED`, `UNAVAILABLE`,
+`NOT_CONNECTED`, `CONNECTING` and `CONNECTED`.
 
-| when | telemetry | `wifi.status` | cadence |
-|---|---|---|---|
-| 02:41, `onGrid` with real power flows | flowing | `CONNECTED` | |
-| midday, `telemetryUnavailable` | absent | `UNAVAILABLE` | |
-| 19:18 | available, snapshot already 4m51s stale | `NOT_CONNECTED` | cellular, minutes |
-| evening, after the AP was restored | flowing | `CONNECTED` | Wi-Fi, 32 seconds |
+| `wifi.status` | observed with |
+|---|---|
+| `CONNECTED` | `onGrid`, telemetry flowing; Wi-Fi cadence 32 seconds |
+| `NOT_CONNECTED` | cellular; a snapshot already 4m51s stale when sampled, then `telemetryUnavailable` |
+| `UNAVAILABLE` | `telemetryUnavailable` while the battery's access point was down |
 
-The all-day telemetry gap was an access point whose PoE injector had been
-unplugged on the ethernet side, so the AP looked powered while carrying no
-traffic. The battery fell back to cellular, the API drops a stale snapshot
-rather than serving it, and `telemetry_available` oscillated for the rest of
-the day with Base's own app showing "No battery data" throughout.
-
-Two traps in that sequence, both of which cost a day:
-
-- The enum strings are separable by length, and an earlier draft of this
-  document recorded the 02:41 capture as `NOT_CONNECTED` on that basis. The
-  capture is a pinned test fixture and says `CONNECTED`. Read the data, not a
-  reconstruction of it.
-- That wrong value was then used to argue Wi-Fi was irrelevant to telemetry,
-  which sent attention at the wrong component. One observation refuting a
-  narrow claim does not establish a broad one.
+The API drops a stale snapshot rather than serving it, so on cellular
+`telemetry_available` oscillates, and Base's own app shows "No battery data".
+The cadence figures come from one battery on one day, which is enough for the
+order-of-magnitude contrast the repair threshold is calibrated against.
 
 ### Telemetry loss is not backup loss
 
-Base's own banner says so: "No battery
-data. Your battery is not currently sending data. Don't worry, in the event of
-a grid outage, it will still provide power to your home." Entities going
-unavailable must not be read as no protection.
+Base's own banner says so: "No battery data. Your battery is not currently
+sending data. Don't worry, in the event of a grid outage, it will still
+provide power to your home." Entities going unavailable must not be read as
+no protection.
 
-### A caveat on every cadence number here
+## Source artefacts
 
-From the evening of 2026-09-13 the
-owner was working on the battery's Wi-Fi, and Base's UI warns the unit may
-disconnect during that. Any gap measured inside that window is a radio being
-reconfigured. What stands either side: cellular at 19:18 and 19:23, available
-with a 4m51s-stale snapshot then unavailable; Wi-Fi at 32 seconds, measured
-after the AP was restored. Both are single-session observations on one
-battery, enough for the order-of-magnitude contrast the repair threshold is
-calibrated against, not enough to quote as a specification.
-
-## Open questions
-
-### Why `UsageService` returns no samples
-
-`GetRecentPower` and `GetRecentGridVoltage` both answer 200 with an empty
-body. proto3 JSON omits empty repeated fields, so `{}` means `samples` is
-empty rather than the call having failed. It may need a metering capability
-this site lacks, a time window the request does not carry, or history that has
-not accumulated. No sensor is built on them until it is understood; one would
-sit at `unknown` for ever and look broken.
-
-Ruled out: that this client calls it differently from the app. The bundle has
-two `getRecentPower`s. The one that surfaces first is the app's mock
-(`useMockContext` / `isMock`), which manufactures samples with `Math.sin` over
-`Array.from({length})`. Do not mistake it for the real client. The real one
-(function #40185, same shape for `getRecentGridVoltage` and `getDailyEnergy`)
-calls `client.getRecentPower({ addressId })` and maps `samples`, with no time
-window and no extra field. The request is authorised, answering 200 rather
-than a permission error.
-
-The decisive test costs nothing: open the usage screen in the Base app. If it
-shows history, the emptiness is about this client. If the app is equally
-empty, the data is not there for this site.
-
-### Smaller open questions
-
-Each is dated, with what would close it, so staleness is visible rather than
-silent.
-
-- How long a `__client` credential lasts before Clerk ends the session.
-  Unknown as of 2026-09-13; the first reauth prompt in normal service answers
-  it. The integration raises a reauth flow rather than assuming a lifetime.
-- `GetDailyEnergy`, uncalled as of 2026-09-13. It takes a service period, so a
-  window has to be chosen first. It is the route to the energy dashboard.
-- `StartManualBackup` and `ResetOvercurrent`, unexercised as of 2026-09-13.
-  Both act on real hardware, the probe refuses them by allowlist, and no
-  entity exposes them. Only the owner running one deliberately closes this.
-
-## Where the source artefacts are kept
-
-Outside this repo, in a gitignored working directory on the analysis machine,
-so re-analysis never needs the phone plugged in again:
+Kept outside this repo in a gitignored working directory, so re-analysis never
+needs the phone again:
 
 | file | |
 |---|---|
@@ -315,10 +262,10 @@ so re-analysis never needs the phone plugged in again:
 | `strings.literal.txt` | the delimited string literals, which `decode_descriptors.py` reads |
 | `strings.identifier.txt` | the identifier table |
 
-They are not committed: the repo holds the derived contract, not Base's app.
-`.gitignore` refuses `*.apk`, `bundle.hasm` and `strings.*.txt` so they cannot
-be added by accident. The 96 MB disassembly is not kept, since
-`hbc-disassembler` regenerates it from the APK in a couple of minutes.
+The repo holds the derived contract, not Base's app. `.gitignore` refuses
+`*.apk`, `bundle.hasm` and `strings.*.txt` so they cannot be added by
+accident. The 96 MB disassembly is not kept, since `hbc-disassembler`
+regenerates it from the APK in a couple of minutes.
 
 Tooling: jadx 1.5.6, and a venv with `hermes-dec`, `androguard` and
 `protobuf`. On Windows, put that venv at a short path. MAX_PATH rejects a deep
@@ -345,6 +292,5 @@ the API client. The contract survives because `@bufbuild/protobuf` embeds each
 `.proto` as a base64 `FileDescriptorProto`, which is what
 `decode_descriptors.py` recovers.
 
-Other third parties in the app, for completeness: Sentry (org
-`base-power-company`), PostHog, Intercom (`cwv51e9k`), Stripe, and Firebase
-messaging for push.
+Other third parties in the app: Sentry (org `base-power-company`), PostHog,
+Intercom (`cwv51e9k`), Stripe, and Firebase messaging for push.
