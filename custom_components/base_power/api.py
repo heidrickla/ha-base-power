@@ -314,8 +314,8 @@ def _samples(data: dict[str, Any]) -> list[dict[str, Any]]:
     thing, since list("abc") is three strings past a signature promising dicts.
     mypy sees neither, because the value is Any and Any is iterable.
 
-    These two methods return empty for the site this was built against, so the
-    populated shape is unobserved and the annotation is a guess.
+    The annotation follows the `.proto` field list. These two methods return
+    no samples for the site this was built against.
     """
     samples = data.get("samples")
     if not isinstance(samples, list):

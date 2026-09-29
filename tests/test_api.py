@@ -142,9 +142,7 @@ def test_wifi_rides_alongside_the_variant():
 # reproduced because they are not needed to pin the contract.
 LIVE_ON_GRID = {
     "snapshot": {
-        # CONNECTED, straight off the wire. Worth noting because docs/API.md
-        # spent a draft asserting this capture read NOT_CONNECTED, reasoning
-        # from string length instead of reading the fixture sitting here.
+        # CONNECTED, straight off the wire.
         "wifi": {
             "status": "BATTERY_WIFI_CONNECTION_STATUS_CONNECTED",
             "observedAt": "2026-09-13T02:41:09.000Z",
