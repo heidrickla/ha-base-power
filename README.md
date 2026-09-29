@@ -1,19 +1,12 @@
 # ha-base-power
 
-A Home Assistant integration for Base Power home batteries, and the
-reverse-engineering record it is built on.
+A Home Assistant integration for Base Power home batteries, and the reverse-engineering record it is built on.
 
-Base ships no public API and no local interface. The contract here was
-recovered from the Android app (`com.basepowercompany.basemobileapp` 1.14.0),
-which is React Native on Hermes and talks Connect RPC to
-`https://dashboard.baseapis.net` with a Clerk session token.
+Base ships no public API and no local interface. The contract here was recovered from the Android app (`com.basepowercompany.basemobileapp` 1.14.0), which is React Native on Hermes and talks Connect RPC to `https://dashboard.baseapis.net` with a Clerk session token.
 
-- [docs/API.md](docs/API.md): the recovered contract. Transport, auth, every
-  service and method, the message fields, and what each maps to.
-- [proto/](proto/): the `dashboard.mobile.v2` `.proto` files, decoded from the
-  descriptors the app embeds. Authoritative field list.
-- [tools/decode_descriptors.py](tools/decode_descriptors.py): recovers those
-  files from a Hermes bundle's string table.
+- [docs/API.md](docs/API.md): the recovered contract. Transport, auth, every service and method, the message fields, and what each maps to.
+- [proto/](proto/): the `dashboard.mobile.v2` `.proto` files, decoded from the descriptors the app embeds. Authoritative field list.
+- [tools/decode_descriptors.py](tools/decode_descriptors.py): recovers those files from a Hermes bundle's string table.
 
 ## Accuracy
 
@@ -25,34 +18,25 @@ Three cross-checks on one installation:
 | Stored energy | The 750 W-reference derivation agrees with the backup-at-current-usage figure to 0.4% |
 | Another vendor | `to_home` within 1.9% of a whole-panel CT monitor on the same house, which shares no code path with this integration |
 
-`docs/API.md` separates what the live service returned from what was read out
-of the app binary.
+`docs/API.md` separates what the live service returned from what was read out of the app binary.
 
 ## Setting it up
 
-Base Power has no password. Clerk emails a six-digit code, and the config flow
-does that for you:
+Base Power has no password. Clerk emails a six-digit code, and the config flow does that for you:
 
 1. Add the integration and choose "Sign in with an emailed code".
 2. Enter the email address on your Base account.
 3. Enter the code they send.
 
-Home Assistant keeps the durable credential Clerk returns and mints
-short-lived tokens from it, the same way the mobile app does.
+Home Assistant keeps the durable credential Clerk returns and mints short-lived tokens from it, the same way the mobile app does.
 
-A second menu option, "paste a credential", covers what the code route cannot:
-an account that signs in only with Google or Apple, an account with two-factor
-authentication, or a change at Clerk that breaks the code flow. It takes the
-`__client` cookie from a browser session, described in `docs/API.md`.
+A second menu option, "paste a credential", covers what the code route cannot: an account that signs in only with Google or Apple, an account with two-factor authentication, or a change at Clerk that breaks the code flow. It takes the `__client` cookie from a browser session, described in `docs/API.md`.
 
 ## Supported devices
 
-One Base Power battery installation, as one device per site on the account.
-Everything is scoped by the site's address id, which the integration discovers
-at setup. An account with two sites gets two config entries.
+One Base Power battery installation, as one device per site on the account. Everything is scoped by the site's address id, which the integration discovers at setup. An account with two sites gets two config entries.
 
-It talks to Base's cloud. There is no local API and no local network path to
-the unit.
+It talks to Base's cloud. There is no local API and no local network path to the unit.
 
 ## Entities
 
@@ -72,92 +56,51 @@ All from `BatteryService/GetSnapshot`, polled together.
 | Running off grid (binary) | `problem`, on for any off-grid state, not only an outage |
 | Battery Wi-Fi network | diagnostic, disabled by default |
 
-Stored energy is derived because Base publishes no state of charge while on
-grid, so there is no direct "how full is it" reading in normal operation. What
-it does publish is estimated backup hours at a 750 W reference load, and hours
-times 0.75 kW is the energy those hours imply. It is arithmetic on a published
-figure, not a measurement, and it inherits Base's assumptions about the
-reference load.
+Stored energy is derived because Base publishes no state of charge while on grid, so there is no direct "how full is it" reading in normal operation. What it does publish is estimated backup hours at a 750 W reference load, and hours times 0.75 kW is the energy those hours imply. It is arithmetic on a published figure, not a measurement, and it inherits Base's assumptions about the reference load.
 
-Grid voltage and recent-power history are not provided. Those methods exist
-and are authorised, but return no samples for the site this was built against.
-A sensor fed by them would read `unknown` indefinitely, which looks like a
-broken integration rather than an empty data source.
+Grid voltage and recent-power history are not provided. Those methods exist and are authorised, but return no samples for the site this was built against. A sensor fed by them would read `unknown` indefinitely, which looks like a broken integration rather than an empty data source.
 
-Buttons for `StartManualBackup` and `ResetOvercurrent` are not provided
-either. The API exposes both, and both act on real hardware in someone's
-house.
+Buttons for `StartManualBackup` and `ResetOvercurrent` are not provided either. The API exposes both, and both act on real hardware in someone's house.
 
 ## How data updates
 
-Cloud polling, every 30 seconds by default, configurable with a floor of 15 s.
-There is no push channel; the mobile app polls too.
+Cloud polling, every 30 seconds by default, configurable with a floor of 15 s. There is no push channel; the mobile app polls too.
 
-The app refreshes every second, but only while its screen is open and focused.
-Home Assistant polls continuously, so copying that rate would mean 86,400
-requests a day against Base's production service for data that moves far
-slower.
+The app refreshes every second, but only while its screen is open and focused. Home Assistant polls continuously, so copying that rate would mean 86,400 requests a day against Base's production service for data that moves far slower.
 
-Entities go unavailable when a poll fails, and when Base answers
-`telemetry_unavailable`, which is the service saying it has no current
-reading. Holding the last value through either would show a stale number as
-current. Battery state is the deliberate exception: it stays available to say
-why the others went away.
+Entities go unavailable when a poll fails, and when Base answers `telemetry_unavailable`, which is the service saying it has no current reading. Holding the last value through either would show a stale number as current. Battery state is the deliberate exception: it stays available to say why the others went away.
 
 ### Reporting gaps and the Wi-Fi link
 
-The battery has its own reporting cadence, separate from the poll interval,
-and Home Assistant cannot speed it up. It reports over Wi-Fi when it can and
-falls back to cellular when it cannot. Measured on one battery:
+The battery has its own reporting cadence, separate from the poll interval, and Home Assistant cannot speed it up. It reports over Wi-Fi when it can and falls back to cellular when it cannot. Measured on one battery:
 
 | Link | Between observations |
 |---|---|
 | Wi-Fi | 32 seconds |
 | Cellular | minutes. A snapshot already 4m51s old when sampled, and no current telemetry about ten minutes after the last report. |
 
-Base drops a snapshot once it goes stale rather than serving an old one, so on
-cellular `telemetry_unavailable` comes and goes in ordinary service and
-entities drop out for a few minutes at a time. At the Wi-Fi cadence they do
-not.
+Base drops a snapshot once it goes stale rather than serving an old one, so on cellular `telemetry_unavailable` comes and goes in ordinary service and entities drop out for a few minutes at a time. At the Wi-Fi cadence they do not.
 
-Repeated gaps usually mean the battery has fallen back to cellular. Enable the
-Battery Wi-Fi network diagnostic; if it reads anything but connected, check
-the access point the battery associates with. An access point whose PoE
-injector is unplugged on the Ethernet side looks powered while carrying no
-traffic, and Base's own app then shows "No battery data".
+Repeated gaps usually mean the battery has fallen back to cellular. Enable the Battery Wi-Fi network diagnostic; if it reads anything but connected, check the access point the battery associates with. An access point whose PoE injector is unplugged on the Ethernet side looks powered while carrying no traffic, and Base's own app then shows "No battery data".
 
-Polling faster does not help: it asks more often for data the battery has not
-sent. An automation or template sensor can hold the last value; this
-integration does not, because a stale kW figure is indistinguishable from a
-real one.
+Polling faster does not help: it asks more often for data the battery has not sent. An automation or template sensor can hold the last value; this integration does not, because a stale kW figure is indistinguishable from a real one.
 
-A repair notice appears after 30 minutes without telemetry. That is longer
-than the cellular cadence and short enough to catch a battery that has stopped
-reporting.
+A repair notice appears after 30 minutes without telemetry. That is longer than the cellular cadence and short enough to catch a battery that has stopped reporting.
 
 ## Configuration
 
-One option, under Configure: poll interval in seconds. Default 30, minimum 15,
-maximum 3600. Changing it reloads the entry.
+One option, under Configure: poll interval in seconds. Default 30, minimum 15, maximum 3600. Changing it reloads the entry.
 
 ## Use cases
 
-- Know the power is out before you notice. Grid outage is a `problem` binary
-  sensor, so an automation can notify on it directly. An unavailable entity
-  cannot be notified on, which is why this exists as its own sensor.
-- Watch the battery drain during an outage. Estimated backup time and State of
-  charge both populate once off grid.
+- Know the power is out before you notice. Grid outage is a `problem` binary sensor, so an automation can notify on it directly. An unavailable entity cannot be notified on, which is why this exists as its own sensor.
+- Watch the battery drain during an outage. Estimated backup time and State of charge both populate once off grid.
 - See charge and discharge on one graph, because Power from storage is signed.
-- Alert on a battery fault. Battery state distinguishes an overcurrent trip
-  from an ordinary outage.
+- Alert on a battery fault. Battery state distinguishes an overcurrent trip from an ordinary outage.
 
-Check your entity ids before copying the examples below. The prefix is your
-device name, not the domain, and it differs between accounts.
+Check your entity ids before copying the examples below. The prefix is your device name, not the domain, and it differs between accounts.
 
-Base returns a name for some sites and not others. When it returns none, the
-integration falls back to the literal "Base Power", giving `base_power_`.
-When it returns one, say Home, you get `home_` instead. Open Settings >
-Devices & services, click the device, and read the prefix off any entity.
+Base returns a name for some sites and not others. When it returns none, the integration falls back to the literal "Base Power", giving `base_power_`. When it returns one, say Home, you get `home_` instead. Open Settings > Devices & services, click the device, and read the prefix off any entity.
 
 The examples use the `base_power_` fallback. For a named site, substitute:
 
@@ -214,29 +157,18 @@ template:
 | "Base Power is temporarily refusing sign-in attempts" | Clerk rate-limiting. Wait a few minutes; retrying immediately makes it worse. |
 | Sign-in fails and mentions Google, Apple or two-factor | The emailed-code route cannot complete those. Use the paste option. |
 
-Diagnostics are available from the entry menu. They contain no credential, no
-Wi-Fi network name, and the address id only as a short digest.
+Diagnostics are available from the entry menu. They contain no credential, no Wi-Fi network name, and the address id only as a short digest.
 
 ## Removing it
 
-Delete the config entry from Settings > Devices & services. That removes the
-device, its entities and the stored credential. Nothing is changed at Base:
-the Home Assistant session is one of several on the account and ending it does
-not affect the app. To revoke access at Base's end, sign out of all sessions
-from your Base account.
+Delete the config entry from Settings > Devices & services. That removes the device, its entities and the stored credential. Nothing is changed at Base: the Home Assistant session is one of several on the account and ending it does not affect the app. To revoke access at Base's end, sign out of all sessions from your Base account.
 
 ## Scope and conduct
 
-This is interoperability work on hardware the owner owns, for their own data.
-It reads the app already installed on the owner's phone. It is not a licence
-to hammer Base's service: poll conservatively, and treat the two control
-methods as what they are, commands to a live battery.
+This is interoperability work on hardware the owner owns, for their own data. It reads the app already installed on the owner's phone. It is not a licence to hammer Base's service: poll conservatively, and treat the two control methods as what they are, commands to a live battery.
 
-Not affiliated with, endorsed by, or supported by Base Power. Base can change
-or withdraw this API at any time without notice.
+Not affiliated with, endorsed by, or supported by Base Power. Base can change or withdraw this API at any time without notice.
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). That covers the code here. It does not cover
-Base's application, which is not redistributed: this repo holds the derived
-contract in `proto/` and `docs/`.
+MIT, see [LICENSE](LICENSE). That covers the code here. It does not cover Base's application, which is not redistributed: this repo holds the derived contract in `proto/` and `docs/`.
