@@ -30,7 +30,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import BasePowerAuthError, BasePowerClient, BasePowerError
-from .clerk import ClerkAuthError, ClerkSessionProvider
+from .clerk import ClerkAuthError, ClerkSessionProvider, ClerkUnavailableError
 from .clerk_signin import (
     ClerkBadCode,
     ClerkCodeExpired,
@@ -184,7 +184,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
             locations = await client.list_locations()
         except (ClerkAuthError, BasePowerAuthError):
             errors["base"] = "invalid_auth"
-        except BasePowerError:
+        except (BasePowerError, ClerkUnavailableError):
             errors["base"] = "cannot_connect"
         except Exception:
             _LOGGER.exception("unexpected error validating the Base Power credential")

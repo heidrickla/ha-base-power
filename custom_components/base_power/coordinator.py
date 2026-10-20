@@ -27,7 +27,7 @@ from .api import (
     BatterySnapshot,
     LocationCapabilities,
 )
-from .clerk import ClerkAuthError, ClerkSessionProvider
+from .clerk import ClerkAuthError, ClerkSessionProvider, ClerkUnavailableError
 from .const import (
     BILLING_INTERVAL,
     CONF_ADDRESS_ID,
@@ -94,7 +94,7 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
         """
         try:
             self.capabilities = await self.client.get_capabilities(self.address_id)
-        except (BasePowerError, ClerkAuthError) as err:
+        except (BasePowerError, ClerkAuthError, ClerkUnavailableError) as err:
             _LOGGER.warning(
                 "Could not read the site's capabilities (%s); continuing without the "
                 "capability-gated entities",
@@ -156,7 +156,7 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
     async def _async_refresh_accounts(self) -> None:
         try:
             accounts = await self.client.list_accounts(self.address_id)
-        except (BasePowerError, ClerkAuthError) as err:
+        except (BasePowerError, ClerkAuthError, ClerkUnavailableError) as err:
             self._note_extra("billing", err)
             return
         self._note_extra("billing", None)
@@ -269,13 +269,19 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
                     translation_key="auth_failed",
                     translation_placeholders={"error": str(retry_err)},
                 ) from retry_err
+            except (BasePowerError, ClerkUnavailableError) as retry_err:
+                raise UpdateFailed(
+                    translation_domain=DOMAIN,
+                    translation_key="api_error",
+                    translation_placeholders={"error": str(retry_err)},
+                ) from retry_err
         except ClerkAuthError as err:
             raise ConfigEntryAuthFailed(
                 translation_domain=DOMAIN,
                 translation_key="auth_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
-        except BasePowerError as err:
+        except (BasePowerError, ClerkUnavailableError) as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="api_error",
@@ -285,3 +291,8 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
     @property
     def snapshot(self) -> BatterySnapshot | None:
         return self.data
+
+    @property
+    def sign_in_times(self) -> dict[str, str | None]:
+        """Clerk's times for the session the stored credential holds."""
+        return dict(self._auth.session_times)

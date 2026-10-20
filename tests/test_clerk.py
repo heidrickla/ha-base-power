@@ -7,7 +7,8 @@ The contract these pin is "degrades to sign in again", not "does not crash".
 An unexpected Clerk response must raise ClerkAuthError, which is what the
 entry translates into a reauth prompt. Any other exception escapes as an
 unexpected error, the user is never prompted, and the integration stays
-broken.
+broken. A Clerk outage (no answer, a rate limit, a 5xx) raises
+ClerkUnavailableError instead: it says nothing about the credential.
 """
 
 from __future__ import annotations
@@ -19,24 +20,32 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "base_power"))
 
+import aiohttp
 from clerk import (
     ASSUMED_LIFETIME,
     CLERK_HOST,
     REFRESH_MARGIN,
     ClerkAuthError,
     ClerkSessionProvider,
+    ClerkUnavailableError,
 )
 
 
 class FakeResponse:
-    def __init__(self, status=200, body=None):
+    def __init__(self, status=200, body=None, raw=False, fail=None):
         self.status = status
         self._body = body
+        self._raw = raw
+        self._fail = fail
 
     async def json(self, content_type=None):
+        if self._raw:
+            raise ValueError("not JSON")
         return self._body
 
     async def __aenter__(self):
+        if self._fail is not None:
+            raise self._fail
         return self
 
     async def __aexit__(self, *exc):
@@ -207,3 +216,75 @@ async def test_the_headers_are_the_ones_clerk_actually_requires():
         assert h["Origin"].startswith("https://")
         assert "Mozilla/5.0" in h["User-Agent"]
         assert "Authorization" not in h
+
+
+# ------------------------------------------------ outages are not refusals
+
+
+@pytest.mark.parametrize("status", [408, 429, 500, 502, 503])
+async def test_an_outage_reading_the_client_keeps_the_sign_in(status):
+    """Issue #1: users were sent to sign in again every few days. A busy or
+    failing Clerk says nothing about the credential."""
+    session = FakeSession(FakeResponse(status, {}))
+    provider = ClerkSessionProvider(session, "__client_value")
+    with pytest.raises(ClerkUnavailableError):
+        await provider.async_get_token()
+
+
+async def test_an_outage_minting_keeps_the_sign_in_and_does_not_rediscover():
+    session = FakeSession(client_ok(), FakeResponse(503, {}))
+    provider = ClerkSessionProvider(session, "__client_value")
+    with pytest.raises(ClerkUnavailableError):
+        await provider.async_get_token()
+    assert len(session.calls) == 2
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        FakeResponse(fail=aiohttp.ClientConnectionError("reset")),
+        FakeResponse(fail=TimeoutError()),
+        FakeResponse(200, raw=True),
+    ],
+    ids=["connection-error", "timeout", "200-without-json"],
+)
+async def test_no_answer_from_clerk_keeps_the_sign_in(response):
+    session = FakeSession(response)
+    provider = ClerkSessionProvider(session, "__client_value")
+    with pytest.raises(ClerkUnavailableError):
+        await provider.async_get_token()
+
+
+async def test_a_refusal_without_json_is_still_a_refusal():
+    session = FakeSession(FakeResponse(401, raw=True))
+    provider = ClerkSessionProvider(session, "__client_value")
+    with pytest.raises(ClerkAuthError):
+        await provider.async_get_token()
+
+
+async def test_the_session_times_are_kept_for_diagnostics():
+    times = {
+        "created_at": 1789326140000,
+        "last_active_at": 1792000000000,
+        "expire_at": 1791918140000,
+        "abandon_at": 1791918140000,
+    }
+    session = FakeSession(
+        FakeResponse(
+            200,
+            {
+                "response": {
+                    "sessions": [{"id": "sess_1", "status": "active", **times, "user": {"x": 1}}]
+                }
+            },
+        ),
+        minted(),
+    )
+    provider = ClerkSessionProvider(session, "__client_value")
+    await provider.async_get_token()
+    assert provider.session_times == {
+        "created_at": "2026-09-13T19:02:20+00:00",
+        "last_active_at": "2026-10-14T17:46:40+00:00",
+        "expire_at": "2026-10-13T19:02:20+00:00",
+        "abandon_at": "2026-10-13T19:02:20+00:00",
+    }

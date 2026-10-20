@@ -25,7 +25,7 @@ from custom_components.base_power.api import (
     BasePowerError,
     Location,
 )
-from custom_components.base_power.clerk import ClerkAuthError
+from custom_components.base_power.clerk import ClerkAuthError, ClerkUnavailableError
 from custom_components.base_power.clerk_signin import (
     ClerkBadCode,
     ClerkCodeExpired,
@@ -416,6 +416,7 @@ async def test_reauth_handles_the_remaining_failures(
         (ClerkAuthError("credential dead"), "invalid_auth"),
         (BasePowerAuthError("token refused"), "invalid_auth"),
         (BasePowerError("service down"), "cannot_connect"),
+        (ClerkUnavailableError("Clerk answered HTTP 503"), "cannot_connect"),
     ],
 )
 async def test_a_credential_that_does_not_work_says_which_kind_of_failure(

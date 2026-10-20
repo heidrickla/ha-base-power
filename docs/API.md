@@ -43,7 +43,7 @@ No custom JWT template is used. Clerk's `getToken()` accepts `{ template, leeway
 | cookie | lifetime | use |
 |---|---|---|
 | `__session` | ~60 s | the bearer JWT for API calls. Fine for one manual test, useless to store. |
-| `__client` | long-lived | the durable credential. Mints fresh session JWTs via `POST https://clerk.basepowercompany.com/v1/client/sessions/<session_id>/tokens`. |
+| `__client` | the Clerk session's lifetime: `GET /v1/client` gives each session's `expire_at` and `abandon_at` (epoch ms) | the durable credential. Mints fresh session JWTs via `POST https://clerk.basepowercompany.com/v1/client/sessions/<session_id>/tokens`. |
 
 The integration stores the client credential and mints a session token per poll, caching each until close to expiry. That is what `BasePowerClient`'s `token_provider` callable exists for. When Clerk ends the session the integration starts reauthentication; it assumes no credential lifetime.
 

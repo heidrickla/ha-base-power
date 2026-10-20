@@ -59,6 +59,9 @@ async def async_get_config_entry_diagnostics(
         # What the site declares it has. This is the answer to "why is there
         # no solar sensor" - the commonest question this integration will be
         # asked, and one that looks like a bug until you see the capability.
+        # When Base's sign-in session started, was last used and ends. Times only:
+        # they answer "why was I asked to sign in again" without the credential.
+        "sign_in_session": coordinator.sign_in_times,
         "capabilities": asdict(coordinator.capabilities),
         "snapshot": _snapshot_diagnostics(snapshot),
         # Whether the hourly series reached long-term statistics, and how many

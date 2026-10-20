@@ -31,7 +31,7 @@ from custom_components.base_power.api import (
     BatterySnapshot,
     LocationCapabilities,
 )
-from custom_components.base_power.clerk import ClerkAuthError
+from custom_components.base_power.clerk import ClerkAuthError, ClerkUnavailableError
 from custom_components.base_power.const import (
     CONF_ADDRESS_ID,
     CONF_CLIENT_JWT,
@@ -327,6 +327,47 @@ async def test_an_api_auth_error_also_triggers_reauth_after_one_retry(
     coordinator._auth.async_refresh.assert_awaited()
 
 
+def _reauth_flows(hass: HomeAssistant) -> list:
+    return [
+        f
+        for f in hass.config_entries.flow.async_progress()
+        if f["context"].get("source") == "reauth"
+    ]
+
+
+async def test_a_clerk_outage_fails_the_poll_without_asking_to_sign_in(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    """A rate limit or a 5xx from Clerk says nothing about the credential. Treated
+    as a refusal it sent users to sign in again every few days (issue #1)."""
+    await _setup(hass, mock_entry)
+    client = _client(snapshot_error=ClerkUnavailableError("Clerk answered HTTP 503"))
+    mock_entry.runtime_data.client = client
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=60))
+    await hass.async_block_till_done()
+
+    assert not _reauth_flows(hass)
+    assert _state(hass, "power_to_home").state == STATE_UNAVAILABLE
+
+
+async def test_a_clerk_outage_during_the_retry_does_not_ask_to_sign_in(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    await _setup(hass, mock_entry)
+    client = _client(snapshot_error=BasePowerAuthError("401"))
+    coordinator = mock_entry.runtime_data
+    coordinator.client = client
+    coordinator._auth.async_refresh = AsyncMock(
+        side_effect=ClerkUnavailableError("Clerk answered HTTP 429")
+    )
+
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=60))
+    await hass.async_block_till_done()
+
+    coordinator._auth.async_refresh.assert_awaited()
+    assert not _reauth_flows(hass)
+
+
 # ------------------------------------------------------------- repair issue
 
 
@@ -393,8 +434,12 @@ async def test_diagnostics_carry_no_credential_and_no_network_name(
 
     assert await async_setup_component(hass, "diagnostics", {})
     await _setup(hass, mock_entry)
+    times = {"created_at": "2026-09-13T19:02:20+00:00", "expire_at": "2026-10-13T19:02:20+00:00"}
+    mock_entry.runtime_data._auth.session_times = times
     report = await get_diagnostics_for_config_entry(hass, hass_client, mock_entry)
     blob = json.dumps(report)
+
+    assert report["sign_in_session"] == times
 
     assert "client_credential_value" not in blob
     assert "ExampleNet-5G" not in blob
