@@ -25,7 +25,7 @@ jobs:
   pure:
     if: github.server_url == 'https://github.com'
     name: Parsing layer, without Home Assistant
-    runs-on: ubuntu-26.04
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-26.04' || 'ubuntu-latest' }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,7 +53,7 @@ jobs:
   home-assistant:
     if: github.server_url == 'https://github.com'
     name: Home Assistant layer
-    runs-on: ubuntu-26.04
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-26.04' || 'ubuntu-latest' }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
