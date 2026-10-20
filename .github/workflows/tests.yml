@@ -15,15 +15,16 @@ concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
 
-# Gitea's act_runner also picks up .github/workflows, so every job is gated to
-# GitHub.
+# The forge runs these jobs too. Its runner has no ubuntu-26.04 label, its
+# setup-python toolcache is shared with other repositories (so installs go
+# into a venv), and it ignores a job's timeout-minutes (so steps carry one).
 #
-# Two environments on purpose. The pure suite runs with NO Home Assistant
-# installed, which is the check: if an HA import reaches api.py or clerk.py it
-# stops collecting and says so. A single environment would hide that.
+# Two environments on purpose. The pure suite runs with NO Home Assistant and
+# no third-party runtime package installed, which is the check: if an import
+# from either reaches api.py or clerk.py it stops collecting and says so. A
+# single environment would hide that.
 jobs:
   pure:
-    if: github.server_url == 'https://github.com'
     name: Parsing layer, without Home Assistant
     runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-26.04' || 'ubuntu-latest' }}
     steps:
@@ -35,23 +36,27 @@ jobs:
           python-version: "3.12"
 
       - name: Install
+        timeout-minutes: 10
         run: |
-          python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet pytest pytest-asyncio ruff
+          python -m venv .venv
+          .venv/bin/python -m pip install --quiet --upgrade pip
+          .venv/bin/python -m pip install --quiet pytest pytest-asyncio ruff
 
       - name: Ruff
+        timeout-minutes: 5
         run: |
-          python -m ruff check .
-          python -m ruff format --check .
+          .venv/bin/python -m ruff check .
+          .venv/bin/python -m ruff format --check .
 
       - name: Pure tests
-        run: python -m pytest tests -q
+        timeout-minutes: 10
+        run: .venv/bin/python -m pytest tests -q
 
       - name: Offline validator
-        run: python tools/validate_local.py
+        timeout-minutes: 5
+        run: .venv/bin/python tools/validate_local.py
 
   home-assistant:
-    if: github.server_url == 'https://github.com'
     name: Home Assistant layer
     runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-26.04' || 'ubuntu-latest' }}
     steps:
@@ -67,15 +72,18 @@ jobs:
           python-version: "3.14"
 
       - name: Install
+        timeout-minutes: 15
         run: |
-          python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet \
+          python -m venv .venv
+          .venv/bin/python -m pip install --quiet --upgrade pip
+          .venv/bin/python -m pip install --quiet \
             "pytest-homeassistant-custom-component==0.13.365" \
             "mypy==1.18.2"
 
       - name: Full suite with coverage
+        timeout-minutes: 15
         run: |
-          python -m pytest tests -q \
+          .venv/bin/python -m pytest tests -q \
             --cov=custom_components/base_power \
             --cov-report=term-missing --cov-fail-under=95
 
@@ -84,4 +92,5 @@ jobs:
       # parse Home Assistant's own 3.14 source and stops before reaching this
       # integration, and it silences the HA-facing modules by name.
       - name: mypy strict, all modules
-        run: python -m mypy --config-file mypy-full.ini custom_components/base_power
+        timeout-minutes: 15
+        run: .venv/bin/python -m mypy --config-file mypy-full.ini custom_components/base_power
