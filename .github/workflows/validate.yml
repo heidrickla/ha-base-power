@@ -23,7 +23,8 @@ concurrency:
   group: validate-${{ github.ref }}
   cancel-in-progress: true
 
-# The forge runs these jobs too; its runner has no ubuntu-26.04 label.
+# The forge runs these jobs too, HACS validation excepted; its runner has no
+# ubuntu-26.04 label.
 #
 # This file is the publication side: hassfest and the HACS action, which HACS
 # requires green, plus the secret guard. Ruff, the tests, mypy and the offline
@@ -39,7 +40,10 @@ jobs:
       - name: Run hassfest validation
         uses: home-assistant/actions/hassfest@a7c616ce81ccda50150bf1595786c71b1883fabb # master
 
+  # The action reads the repository through GitHub's API; on the forge it
+  # answers 401.
   hacs: # https://github.com/hacs/action
+    if: github.server_url == 'https://github.com'
     name: HACS validation
     runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-26.04' || 'ubuntu-latest' }}
     steps:
