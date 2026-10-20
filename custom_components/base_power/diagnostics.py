@@ -14,21 +14,18 @@ and correlate a report with a log line.
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import asdict
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_ADDRESS_ID, CONF_CLIENT_JWT
+from .const import CONF_ADDRESS_ID, CONF_CLIENT_JWT, address_fingerprint
 from .coordinator import BasePowerConfigEntry
 
 
 def _fingerprint(value: str | None) -> str | None:
     """A short stable digest: correlation without the identifier."""
-    if not value:
-        return None
-    return hashlib.sha256(value.encode()).hexdigest()[:12]
+    return address_fingerprint(value) if value else None
 
 
 async def async_get_config_entry_diagnostics(

@@ -168,16 +168,19 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
         # gets no statistics.
         if "recorder" not in self.hass.config.components:
             return
+        title = self.config_entry.title if self.config_entry else "Base Power"
         try:
             overview = await self.client.get_daily_overview(self.address_id)
-        except (BasePowerError, ClerkAuthError) as err:
+            rows = await async_import(
+                self.hass, self.address_id, title, overview, self.capabilities.has_solar
+            )
+        # The API's errors and the recorder's: either way this run wrote nothing
+        # it can vouch for, and the next one tries again.
+        except Exception as err:
             self._note_extra("energy", err)
             return
         self._note_extra("energy", None)
-        title = self.config_entry.title if self.config_entry else "Base Power"
-        self.energy_rows = await async_import(
-            self.hass, self.address_id, title, overview, self.capabilities.has_solar
-        )
+        self.energy_rows = rows
         self.energy_imported_at = dt_util.utcnow()
 
     def _note_telemetry(self, snapshot: BatterySnapshot) -> None:

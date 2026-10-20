@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import threading
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from energy_helpers import (
@@ -21,8 +24,13 @@ from energy_helpers import (
     _setup,
 )
 from homeassistant.components.recorder import Recorder
-from homeassistant.components.recorder.statistics import statistics_during_period
+from homeassistant.components.recorder.statistics import (
+    statistics_during_period,
+    valid_statistic_id,
+)
+from homeassistant.components.recorder.tasks import RecorderTask
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.recorder import get_instance
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
@@ -30,13 +38,18 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 
 from custom_components.base_power.api import BasePowerError, LocationCapabilities
 from custom_components.base_power.diagnostics import async_get_config_entry_diagnostics
+from custom_components.base_power.hourly_statistics import async_import, statistic_id
 
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(
-    recorder_mock: Recorder, enable_custom_integrations: Any
+    recorder_mock: Recorder, enable_custom_integrations: Any, hass: HomeAssistant
 ) -> Generator[None, None, None]:
-    """The conftest fixture, with the recorder started before Home Assistant."""
+    """The conftest fixture, with the recorder started before Home Assistant.
+
+    The instance prices in USD, as Base does, so the cost series is written.
+    """
+    hass.config.currency = "USD"
     yield
 
 
@@ -159,3 +172,85 @@ async def test_diagnostics_name_the_accounts_but_not_the_amounts(
     assert report["energy"]["rows"] == {"energy_to_home": 2, "grid_cost": 2}
     assert report["energy"]["imported_at"] is not None
     assert "188.53" not in str(report)
+
+
+# ------------------------------------------------------ review round 1 guards
+
+
+async def test_a_window_older_than_the_stored_hours_is_not_written(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    client = _client(overview=_overview([(H[2], 3.0), (H[3], 4.0)]))
+    await _setup(hass, mock_entry, client)
+    client.get_daily_overview.return_value = _overview([(H[0], 1.0), (H[1], 2.0)])
+    await _rerun_energy(hass, mock_entry)
+    assert await _sums(hass, ENERGY) == [(H[2], 3.0, 3.0), (H[3], 4.0, 7.0)]
+
+
+class _HoldQueue(RecorderTask):
+    """Keeps the recorder thread busy until released, so queued writes wait."""
+
+    commit_before = False
+
+    def __init__(self) -> None:
+        self.release = threading.Event()
+
+    def run(self, instance: Recorder) -> None:
+        self.release.wait(10)
+
+
+async def test_an_import_reads_its_baseline_after_queued_writes_commit(
+    hass: HomeAssistant,
+) -> None:
+    """The first import's rows are still queued, as just before a reload."""
+    await async_wait_recording_done(hass)
+    hold = _HoldQueue()
+    get_instance(hass).queue_task(hold)
+    await async_import(hass, "addr", "Home", _overview([(H[0], 1.0), (H[1], 2.0)]), False)
+    second = hass.async_create_task(
+        async_import(hass, "addr", "Home", _overview([(H[1], 2.0), (H[2], 3.0)]), False)
+    )
+    await asyncio.sleep(0.2)
+    hold.release.set()
+    await second
+    assert await _sums(hass, statistic_id("addr", "energy_to_home")) == [
+        (H[0], 1.0, 1.0),
+        (H[1], 2.0, 3.0),
+        (H[2], 3.0, 6.0),
+    ]
+
+
+def test_address_ids_differing_in_case_or_punctuation_get_their_own_statistics() -> None:
+    ids = {statistic_id(a, "energy_to_home") for a in ("A-B", "a_b", "A_B", "ab")}
+    assert len(ids) == 4
+    assert all(valid_statistic_id(i) for i in ids)
+
+
+async def test_cost_is_not_written_in_another_currency(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    hass.config.currency = "EUR"
+    await _setup(hass, mock_entry, _client(overview=_overview([(H[0], 1.0)])))
+    assert await _sums(hass, COST) == []
+    assert await _sums(hass, ENERGY) == [(H[0], 1.0, 1.0)]
+
+
+async def test_a_recorder_failure_is_logged_as_a_failure_and_retried(
+    hass: HomeAssistant, mock_entry: MockConfigEntry, caplog: pytest.LogCaptureFixture
+) -> None:
+    client = _client(overview=_overview([(H[0], 1.0)]))
+    with (
+        caplog.at_level(logging.INFO, logger="custom_components.base_power"),
+        patch(
+            "custom_components.base_power.coordinator.async_import",
+            side_effect=RuntimeError("database is locked"),
+        ),
+    ):
+        await _setup(hass, mock_entry, client)
+    assert caplog.text.count("Could not read Base Power energy data: database is locked") == 1
+    assert "readable again" not in caplog.text
+    assert mock_entry.runtime_data.energy_rows == {}
+    with caplog.at_level(logging.INFO, logger="custom_components.base_power"):
+        await _rerun_energy(hass, mock_entry)
+    assert caplog.text.count("energy data is readable again") == 1
+    assert await _sums(hass, ENERGY) == [(H[0], 1.0, 1.0)]

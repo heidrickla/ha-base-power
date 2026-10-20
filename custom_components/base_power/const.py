@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import timedelta
 
 DOMAIN = "base_power"
@@ -59,3 +60,8 @@ def silent_polls_before_issue(interval: timedelta | None) -> int:
     """
     seconds = (interval or DEFAULT_SCAN_INTERVAL).total_seconds()
     return max(MIN_TELEMETRY_POLLS, round(TELEMETRY_GRACE.total_seconds() / seconds))
+
+
+def address_fingerprint(address_id: str) -> str:
+    """A short stable digest of an address id: correlation without the identifier."""
+    return hashlib.sha256(address_id.encode()).hexdigest()[:12]

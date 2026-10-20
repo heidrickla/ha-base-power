@@ -72,12 +72,12 @@ Hourly energy and cost go into long-term statistics, with no entity. `UsageServi
 
 | Statistic | Unit | Notes |
 |---|---|---|
-| `base_power:<address id>_energy_to_home` | kWh | Everything the house used, from grid, battery and solar together |
-| `base_power:<address id>_grid_cost` | the instance currency | Base's estimate of the grid energy cost |
-| `base_power:<address id>_solar_to_home` | kWh | Sites that declare solar |
-| `base_power:<address id>_solar_export` | kWh | Sites that declare solar |
+| `base_power:<address digest>_energy_to_home` | kWh | Everything the house used, from grid, battery and solar together |
+| `base_power:<address digest>_grid_cost` | the instance currency | Base's estimate of the grid energy cost |
+| `base_power:<address digest>_solar_to_home` | kWh | Sites that declare solar |
+| `base_power:<address digest>_solar_export` | kWh | Sites that declare solar |
 
-Add them in Settings > Dashboards > Energy. Developer tools > Statistics lists them. They need the recorder, which every default configuration has.
+The address digest is the 12 characters diagnostics show as `address_id_fingerprint`. Cost is written when Base prices in the instance's currency. Add them in Settings > Dashboards > Energy. Developer tools > Statistics lists them. They need the recorder, which every default configuration has.
 
 ## How data updates
 

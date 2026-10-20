@@ -106,3 +106,12 @@ async def test_stored_energy_assumes_no_pack_size(
     }
     await _setup(hass, mock_entry, _client(snapshot=core))
     assert hass.states.get("sensor.home_stored_energy").state == "78.4"
+
+
+async def test_a_bill_without_a_currency_is_unknown(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    hass.config.currency = "EUR"
+    accounts = [Account(account_type="energy", currency=None, last_bill=188.53)]
+    await _setup(hass, mock_entry, _client(capabilities=BILLED, accounts=accounts))
+    assert _bill(hass, "energy").state == "unknown"

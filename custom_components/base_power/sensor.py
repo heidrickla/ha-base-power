@@ -250,8 +250,11 @@ class BasePowerBillSensor(BasePowerEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | None:
+        """Unknown when Base sends no currency, which would otherwise be borrowed."""
         account = self._account()
-        return None if account is None else account.last_bill
+        if account is None or account.currency is None:
+            return None
+        return account.last_bill
 
     @property
     def native_unit_of_measurement(self) -> str:
