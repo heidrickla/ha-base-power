@@ -25,3 +25,9 @@ strings.*.txt
 # holding it is as good as the account.
 creds.txt
 *session*.txt
+
+# Agent instruction files stay out of the published repo.
+AGENTS.md
+CLAUDE.md
+CONTRIBUTING.md
+.cursorrules
