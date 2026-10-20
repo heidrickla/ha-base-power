@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
+import aiohttp
 import pytest
 import voluptuous as vol
 from fixtures_const import ADDRESS_ID, CREDENTIAL, EMAIL
@@ -417,6 +418,8 @@ async def test_reauth_handles_the_remaining_failures(
         (BasePowerAuthError("token refused"), "invalid_auth"),
         (BasePowerError("service down"), "cannot_connect"),
         (ClerkUnavailableError("Clerk answered HTTP 503"), "cannot_connect"),
+        (aiohttp.ClientConnectionError("reset"), "cannot_connect"),
+        (TimeoutError(), "cannot_connect"),
     ],
 )
 async def test_a_credential_that_does_not_work_says_which_kind_of_failure(

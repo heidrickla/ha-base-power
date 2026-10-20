@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
+import aiohttp
 import pytest
 from fixtures_const import ADDRESS_ID, CREDENTIAL
 from homeassistant.config_entries import ConfigEntryState
@@ -350,22 +351,30 @@ async def test_a_clerk_outage_fails_the_poll_without_asking_to_sign_in(
     assert _state(hass, "power_to_home").state == STATE_UNAVAILABLE
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        ClerkUnavailableError("Clerk answered HTTP 429"),
+        aiohttp.ClientConnectionError("reset"),
+        TimeoutError(),
+    ],
+    ids=["rate-limit", "connection-error", "timeout"],
+)
 async def test_a_clerk_outage_during_the_retry_does_not_ask_to_sign_in(
-    hass: HomeAssistant, mock_entry: MockConfigEntry
+    hass: HomeAssistant, mock_entry: MockConfigEntry, error: Exception
 ) -> None:
     await _setup(hass, mock_entry)
     client = _client(snapshot_error=BasePowerAuthError("401"))
     coordinator = mock_entry.runtime_data
     coordinator.client = client
-    coordinator._auth.async_refresh = AsyncMock(
-        side_effect=ClerkUnavailableError("Clerk answered HTTP 429")
-    )
+    coordinator._auth.async_refresh = AsyncMock(side_effect=error)
 
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=60))
     await hass.async_block_till_done()
 
     coordinator._auth.async_refresh.assert_awaited()
     assert not _reauth_flows(hass)
+    assert _state(hass, "power_to_home").state == STATE_UNAVAILABLE
 
 
 # ------------------------------------------------------------- repair issue

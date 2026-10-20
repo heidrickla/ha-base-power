@@ -19,6 +19,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
+import aiohttp
 import voluptuous as vol
 from homeassistant.config_entries import (
     ConfigFlow,
@@ -184,7 +185,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
             locations = await client.list_locations()
         except (ClerkAuthError, BasePowerAuthError):
             errors["base"] = "invalid_auth"
-        except (BasePowerError, ClerkUnavailableError):
+        except (BasePowerError, ClerkUnavailableError, aiohttp.ClientError, TimeoutError):
             errors["base"] = "cannot_connect"
         except Exception:
             _LOGGER.exception("unexpected error validating the Base Power credential")

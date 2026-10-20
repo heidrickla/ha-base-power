@@ -29,8 +29,6 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
-import aiohttp
-
 _LOGGER = logging.getLogger(__name__)
 
 CLERK_HOST = "https://clerk.basepowercompany.com"
@@ -120,21 +118,17 @@ class ClerkSessionProvider:
 
     async def _async_request(self, method: str, url: str) -> tuple[int, Any]:
         """(status, decoded body or None); ClerkUnavailableError when the answer
-        says nothing about the credential."""
-        try:
-            async with getattr(self._session, method)(url, headers=self._headers) as resp:
-                status = resp.status
-                try:
-                    body = await resp.json(content_type=None)
-                except ValueError:
-                    body = None
-                    if status == 200:
-                        # A 200 that is not JSON is a proxy or a challenge page.
-                        raise ClerkUnavailableError(
-                            "Clerk answered HTTP 200 without JSON"
-                        ) from None
-        except (aiohttp.ClientError, TimeoutError) as err:
-            raise ClerkUnavailableError(f"Clerk did not answer ({type(err).__name__})") from err
+        says nothing about the credential. A transport error reaches the caller
+        unchanged: Home Assistant's coordinator fails the poll on it."""
+        async with getattr(self._session, method)(url, headers=self._headers) as resp:
+            status = resp.status
+            try:
+                body = await resp.json(content_type=None)
+            except ValueError:
+                body = None
+                if status == 200:
+                    # A 200 that is not JSON is a proxy or a challenge page.
+                    raise ClerkUnavailableError("Clerk answered HTTP 200 without JSON") from None
         if status in TRANSIENT_STATUSES or status >= 500:
             raise ClerkUnavailableError(f"Clerk answered HTTP {status}; the sign-in is kept")
         return status, body

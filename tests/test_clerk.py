@@ -20,7 +20,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "base_power"))
 
-import aiohttp
 from clerk import (
     ASSUMED_LIFETIME,
     CLERK_HOST,
@@ -239,19 +238,22 @@ async def test_an_outage_minting_keeps_the_sign_in_and_does_not_rediscover():
     assert len(session.calls) == 2
 
 
-@pytest.mark.parametrize(
-    "response",
-    [
-        FakeResponse(fail=aiohttp.ClientConnectionError("reset")),
-        FakeResponse(fail=TimeoutError()),
-        FakeResponse(200, raw=True),
-    ],
-    ids=["connection-error", "timeout", "200-without-json"],
-)
-async def test_no_answer_from_clerk_keeps_the_sign_in(response):
-    session = FakeSession(response)
+async def test_a_200_without_json_keeps_the_sign_in():
+    session = FakeSession(FakeResponse(200, raw=True))
     provider = ClerkSessionProvider(session, "__client_value")
     with pytest.raises(ClerkUnavailableError):
+        await provider.async_get_token()
+
+
+@pytest.mark.parametrize(
+    "error", [ConnectionResetError("reset"), TimeoutError()], ids=["connection-error", "timeout"]
+)
+async def test_a_transport_error_reaches_the_caller_unchanged(error):
+    """Home Assistant's coordinator fails the poll on it; as ClerkAuthError it
+    would ask for a new sign-in."""
+    session = FakeSession(FakeResponse(fail=error))
+    provider = ClerkSessionProvider(session, "__client_value")
+    with pytest.raises(type(error)):
         await provider.async_get_token()
 
 
