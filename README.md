@@ -38,9 +38,11 @@ One Base Power battery installation, as one device per site on the account. Ever
 
 It talks to Base's cloud. There is no local API and no local network path to the unit.
 
+Any Base battery: the original units and Base Core, 39.2 kWh or 78.4 kWh as two units. No pack size is assumed anywhere. Stored energy and backup time come from Base's own backup estimate, which already reflects the installed pack.
+
 ## Entities
 
-All from `BatteryService/GetSnapshot`, polled together.
+All from `BatteryService/GetSnapshot`, polled together, except the bills.
 
 | Entity | Notes |
 |---|---|
@@ -55,12 +57,27 @@ All from `BatteryService/GetSnapshot`, polled together.
 | Grid outage (binary) | `problem`, on when the grid is down and the battery is carrying the house |
 | Running off grid (binary) | `problem`, on for any off-grid state, not only an outage |
 | Battery Wi-Fi network | diagnostic, disabled by default |
+| Last energy bill | currency. One per billing account the site has, from `BillingService/ListAccounts`, read at setup and every 6 hours. Only on sites that declare billing. |
+| Last battery bill | as above, for the battery membership account |
 
 Stored energy is derived because Base publishes no state of charge while on grid, so there is no direct "how full is it" reading in normal operation. What it does publish is estimated backup hours at a 750 W reference load, and hours times 0.75 kW is the energy those hours imply. It is arithmetic on a published figure, not a measurement, and it inherits Base's assumptions about the reference load.
 
-Grid voltage and recent-power history are not provided. Those methods exist and are authorised, but return no samples for the site this was built against. A sensor fed by them would read `unknown` indefinitely, which looks like a broken integration rather than an empty data source.
+Grid voltage and the one-minute power history are not used. The power history repeats Power to home.
 
 Buttons for `StartManualBackup` and `ResetOvercurrent` are not provided either. The API exposes both, and both act on real hardware in someone's house.
+
+## Energy dashboard
+
+Hourly energy and cost go into long-term statistics, with no entity. `UsageService/GetDailyOverview` publishes the last 24 completed hours, and a statistic keyed by the hour is what the Energy dashboard reads. The integration reads the overview at setup and every 30 minutes. Each read rewrites every hour it carries, carrying the running sum on from the last stored hour, so an hour Base revises is corrected and a Home Assistant restart leaves no step in the sum.
+
+| Statistic | Unit | Notes |
+|---|---|---|
+| `base_power:<address id>_energy_to_home` | kWh | Everything the house used, from grid, battery and solar together |
+| `base_power:<address id>_grid_cost` | the instance currency | Base's estimate of the grid energy cost |
+| `base_power:<address id>_solar_to_home` | kWh | Sites that declare solar |
+| `base_power:<address id>_solar_export` | kWh | Sites that declare solar |
+
+Add them in Settings > Dashboards > Energy. Developer tools > Statistics lists them. They need the recorder, which every default configuration has.
 
 ## How data updates
 
@@ -97,6 +114,7 @@ One option, under Configure: poll interval in seconds. Default 30, minimum 15, m
 - Watch the battery drain during an outage. Estimated backup time and State of charge both populate once off grid.
 - See charge and discharge on one graph, because Power from storage is signed.
 - Alert on a battery fault. Battery state distinguishes an overcurrent trip from an ordinary outage.
+- Track the house's energy and its cost in the Energy dashboard, hour by hour.
 
 Check your entity ids before copying the examples below. The prefix is your device name, not the domain, and it differs between accounts.
 
@@ -151,6 +169,8 @@ template:
 |---|---|
 | State of charge is `unknown` | Expected while on grid. Use Stored energy instead. |
 | No solar sensor | The site does not declare solar, so the sensor is not created rather than reading a false zero. |
+| No bill sensors | The site declares no billing, or its accounts could not be read at setup, which is logged. Reload the entry to read them again. |
+| No hourly statistics | The recorder is not loaded, or the overview could not be read, which is logged once until it recovers. |
 | Entities go unavailable for a few minutes, repeatedly | The battery is very likely on cellular rather than Wi-Fi. Enable the Battery Wi-Fi network diagnostic; if it is not connected, check the access point. Polling faster will not help. |
 | Everything is unavailable but the integration looks fine | Either the poll is failing or Base answered `telemetry_unavailable`. Battery state stays available and says which. Check the Wi-Fi before contacting Base: cellular fallback is the usual cause. Your backup is unaffected, since the battery still powers the house in an outage while it is not reporting. A repair notice appears after 30 minutes. |
 | Asked to sign in again | A Base session ended or was revoked. Reauthentication re-sends a code to the stored address. |

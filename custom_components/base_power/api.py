@@ -9,9 +9,9 @@ Everything that parses a response is a pure function, testable without a
 network or a token. The transport is a thin wrapper over an aiohttp session.
 
 The shapes come from descriptors embedded in the app. `GetSnapshot`,
-`ListLocations` and `GetLocation` are confirmed live; the rest are still
-readings of the binary, so the parsers stay tolerant of fields they have never
-seen populated.
+`ListLocations`, `GetLocation`, `GetDailyOverview` and `ListAccounts` are
+confirmed live; the rest are still readings of the binary, so the parsers stay
+tolerant of fields they have never seen populated.
 """
 
 from __future__ import annotations
@@ -252,6 +252,101 @@ class Location:
         return out
 
 
+def _hour_series(samples: Any, key: str, scale: float = 1.0) -> tuple[tuple[datetime, float], ...]:
+    """(interval start, value) for each hourly sample, oldest first.
+
+    A sample in the list with the field absent is 0.0, which is how proto3
+    JSON writes a zero. A sample with no parseable start, or one not on the
+    hour, is dropped: long-term statistics are keyed by the top of the hour.
+    """
+    if not isinstance(samples, list):
+        return ()
+    out: dict[datetime, float] = {}
+    for sample in samples:
+        if not isinstance(sample, dict):
+            continue
+        start = _parse_timestamp(sample.get("intervalStart"))
+        if start is None or start.minute or start.second or start.microsecond:
+            continue
+        value = _as_float(sample.get(key))
+        out[start] = (value or 0.0) * scale
+    return tuple(sorted(out.items()))
+
+
+@dataclass(frozen=True)
+class DailyOverview:
+    """The hourly series of GetDailyOverview: the last 24 completed hours.
+
+    Energy in kWh. Cost in currency units, converted from the API's cents.
+    """
+
+    energy_to_home: tuple[tuple[datetime, float], ...] = ()
+    solar_to_home: tuple[tuple[datetime, float], ...] = ()
+    solar_export: tuple[tuple[datetime, float], ...] = ()
+    grid_cost: tuple[tuple[datetime, float], ...] = ()
+    currency: str | None = None
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> DailyOverview:
+        energy = data.get("hourlyEnergy")
+        costs = data.get("hourlyEnergyCosts")
+        currency = data.get("costCurrency")
+        return cls(
+            energy_to_home=_hour_series(energy, "energyToHomeKwh"),
+            solar_to_home=_hour_series(energy, "solarToHomeKwh"),
+            solar_export=_hour_series(energy, "solarExportKwh"),
+            grid_cost=_hour_series(costs, "gridEnergyCents", 0.01),
+            currency=currency if isinstance(currency, str) and currency else None,
+        )
+
+
+# AccountType without its prefix; UNSPECIFIED and anything unfamiliar are skipped.
+ACCOUNT_TYPES: dict[str, str] = {
+    "ACCOUNT_TYPE_ENERGY": "energy",
+    "ACCOUNT_TYPE_BATTERY": "battery",
+}
+
+
+@dataclass(frozen=True)
+class Account:
+    """One billing account of a site: energy service or battery membership."""
+
+    account_type: str
+    currency: str | None = None
+    last_bill: float | None = None
+
+    @classmethod
+    def list_from_json(cls, data: dict[str, Any]) -> list[Account]:
+        """ListAccounts.
+
+        `lastBillAmountCents` is an int64, which Connect JSON writes as a
+        string, and proto3 omits a zero. An account with no billing history
+        has no last bill at all, so it reads None; with history, absent is a
+        bill of zero.
+        """
+        out: list[Account] = []
+        for raw in data.get("accounts") or []:
+            if not isinstance(raw, dict):
+                continue
+            account_type = ACCOUNT_TYPES.get(str(raw.get("accountType") or ""))
+            if account_type is None:
+                continue
+            cents = _as_float(raw.get("lastBillAmountCents"))
+            if raw.get("hasBillingHistory"):
+                last_bill: float | None = round((cents or 0.0) / 100, 2)
+            else:
+                last_bill = None
+            currency = raw.get("currency")
+            out.append(
+                cls(
+                    account_type=account_type,
+                    currency=currency if isinstance(currency, str) and currency else None,
+                    last_bill=last_bill,
+                )
+            )
+        return out
+
+
 class BasePowerClient:
     """Thin Connect-RPC client.
 
@@ -295,6 +390,16 @@ class BasePowerClient:
     async def get_snapshot(self, address_id: str) -> BatterySnapshot:
         return BatterySnapshot.from_json(
             await self.call("BatteryService", "GetSnapshot", {"addressId": address_id})
+        )
+
+    async def get_daily_overview(self, address_id: str) -> DailyOverview:
+        return DailyOverview.from_json(
+            await self.call("UsageService", "GetDailyOverview", {"addressId": address_id})
+        )
+
+    async def list_accounts(self, address_id: str) -> list[Account]:
+        return Account.list_from_json(
+            await self.call("BillingService", "ListAccounts", {"addressId": address_id})
         )
 
     async def get_recent_power(self, address_id: str) -> list[dict[str, Any]]:

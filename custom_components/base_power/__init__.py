@@ -25,8 +25,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: BasePowerConfigEntry) ->
     # Which entities exist depends on what the site declares, so this has to
     # happen before the platforms are forwarded.
     await coordinator.async_load_capabilities()
+    await coordinator.async_load_accounts()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    coordinator.async_start_extras()
     # No update listener here on purpose: the options flow is an
     # OptionsFlowWithReload, which reloads the entry itself when the poll
     # interval changes. Registering a listener as well would reload twice for

@@ -132,12 +132,28 @@ The bundle has two `getRecentPower`s. The first is the app's mock (`useMockConte
 - `NotificationsService`: `RegisterPushDevice`, list/update preferences
 - `CompatibilityService`: `CheckAppCompatibility`
 
+### The legacy service
+
+The app's older client still answers at `dashboard.DashboardAPI/MobileGet*` on the same host, in gRPC-web protobuf only (`application/grpc-web+proto`, `x-grpc-web: 1`, the bare session token in `authorization`). The request is `{1: address id}`; `MobileGetAvailableLocations` lists the same address ids as `ListLocations`. Each method returns a v2 message under field numbers:
+
+| Legacy method | Same fields as |
+|---|---|
+| `MobileGetRecentUsage` | `GetDailyOverview`: field 1 home power, field 2 backup duration (`{1: start, 2: hours at current usage, 3: hours at 750 W}`), 3 grid-support intervals, 4 hourly energy, 5 hourly cost, 6 energy source mix (`{1: grid to home, 3: battery to home}`) |
+| `MobileGetDashboardRoot` | `GetLocation`: field 1 address id, 2 address, 3 battery, 5 referrals |
+| `MobileGetBillingMetadata` | account summary |
+
+`MobileGetGridStatus` and `MobileGetUsageEnergy` answered with an empty message and grpc-status 0. A Bearer prefix on the legacy service also returns an empty message. Nothing here reads the legacy service: every field it carries is in `dashboard.mobile.v2`.
+
 ## What the live calls returned
 
 - Clerk minting works: browser `__client`, `GET /v1/client`, active session, `POST /v1/client/sessions/<sid>/tokens`, a fresh session JWT.
 - `ListLocations` 200, one location: `addressId`, `address` (line1, city, state, postalCode, country, timezone), `status`.
 - `GetSnapshot` 200, `onGrid` variant, `powerFlow` with `fromGridKw` 2.9, `fromStorageKw` -0.3, `nonSolarToHomeKw` 2.6, `toHomeKw` 2.6, plus `estimatedBackupHoursAtCurrentUsage`, `estimatedBackupHoursAt750Watts` and a `wifi` block.
-- `GetRecentPower` and `GetRecentGridVoltage` 200 with an empty body. proto3 JSON omits empty repeated fields, so `{}` means `samples` is empty, not a failed call. No sensor is built on them.
+- `GetRecentGridVoltage` 200 with an empty body. proto3 JSON omits empty repeated fields, so `{}` means `samples` is empty, not a failed call.
+- `GetRecentPower` 200, 15 samples one minute apart, `powerToHomeKw` only. It repeats the snapshot's `toHomeKw`, so no sensor is built on it.
+- `GetDailyOverview` 200, a rolling 24 hours of completed intervals: 96 `homePower` and 96 `backupDuration` samples at 15 minutes, 24 `hourlyEnergy` (`energyToHomeKwh`) and 24 `hourlyEnergyCosts` (`gridEnergyCents`) on the UTC hour, `gridSupportIntervals`, `costCurrency` `USD`, and an `energySourceMix` summed over the same 24 hours. The newest 15-minute sample is the last completed interval and the newest hour the last completed hour.
+- `GetDailyEnergy` 200 for a seven-day `servicePeriodStart`/`servicePeriodEnd`: one sample per local day, `energyToHomeKwh` and `estimatedCost.gridEnergyCents`.
+- `BillingService/ListAccounts` 200: one `AccountSummary` per account, `ACCOUNT_TYPE_ENERGY` and `ACCOUNT_TYPE_BATTERY`, each with `currency`, `status`, `lastBillAmountCents` (int64, so a JSON string) and `hasBillingHistory`.
 
 ### Cross-checks
 

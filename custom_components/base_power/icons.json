@@ -9,6 +9,8 @@
       "stored_energy": { "default": "mdi:battery-charging-100" },
       "state_of_charge": { "default": "mdi:battery" },
       "wifi_ssid": { "default": "mdi:wifi" },
+      "last_bill_energy": { "default": "mdi:receipt-text" },
+      "last_bill_battery": { "default": "mdi:receipt-text" },
       "battery_state": {
         "default": "mdi:battery-unknown",
         "state": {

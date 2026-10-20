@@ -86,6 +86,8 @@
       "stored_energy": { "name": "Stored energy" },
       "state_of_charge": { "name": "State of charge" },
       "wifi_ssid": { "name": "Battery Wi-Fi network" },
+      "last_bill_energy": { "name": "Last energy bill" },
+      "last_bill_battery": { "name": "Last battery bill" },
       "battery_state": {
         "name": "Battery state",
         "state": {

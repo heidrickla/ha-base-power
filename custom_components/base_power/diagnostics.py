@@ -64,6 +64,21 @@ async def async_get_config_entry_diagnostics(
         # asked, and one that looks like a bug until you see the capability.
         "capabilities": asdict(coordinator.capabilities),
         "snapshot": _snapshot_diagnostics(snapshot),
+        # Whether the hourly series reached long-term statistics, and how many
+        # hours each carried.
+        "energy": {
+            "imported_at": (
+                coordinator.energy_imported_at.isoformat()
+                if coordinator.energy_imported_at
+                else None
+            ),
+            "rows": coordinator.energy_rows,
+        },
+        # Which accounts exist, not what they owe.
+        "billing_accounts": [
+            {"type": a.account_type, "has_last_bill": a.last_bill is not None}
+            for a in coordinator.accounts
+        ],
     }
 
 

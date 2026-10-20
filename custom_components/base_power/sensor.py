@@ -30,7 +30,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .api import BatterySnapshot
+from .api import Account, BatterySnapshot
 from .const import BACKUP_REFERENCE_KW
 from .coordinator import BasePowerConfigEntry, BasePowerCoordinator
 from .entity import BasePowerEntity
@@ -148,6 +148,21 @@ SENSORS: tuple[BasePowerSensorDescription, ...] = (
 )
 
 
+# Keyed by Account.account_type.
+BILL_SENSORS: dict[str, SensorEntityDescription] = {
+    "energy": SensorEntityDescription(
+        key="last_bill_energy",
+        translation_key="last_bill_energy",
+        device_class=SensorDeviceClass.MONETARY,
+    ),
+    "battery": SensorEntityDescription(
+        key="last_bill_battery",
+        translation_key="last_bill_battery",
+        device_class=SensorDeviceClass.MONETARY,
+    ),
+}
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: BasePowerConfigEntry,
@@ -165,7 +180,13 @@ async def async_setup_entry(
         # assumption either way.
         if d.key != "power_from_solar" or coordinator.capabilities.has_solar
     ]
-    async_add_entities(BasePowerSensor(coordinator, entry, d) for d in descriptions)
+    entities: list[SensorEntity] = [BasePowerSensor(coordinator, entry, d) for d in descriptions]
+    # One bill sensor per account the site has, read at setup.
+    account_types = dict.fromkeys(
+        a.account_type for a in coordinator.accounts if a.account_type in BILL_SENSORS
+    )
+    entities.extend(BasePowerBillSensor(coordinator, entry, t) for t in account_types)
+    async_add_entities(entities)
 
 
 class BasePowerSensor(BasePowerEntity, SensorEntity):
@@ -206,3 +227,38 @@ class BasePowerSensor(BasePowerEntity, SensorEntity):
         if self.entity_description.key == "battery_state":
             return self.coordinator.last_update_success and self.coordinator.snapshot is not None
         return super().available
+
+
+class BasePowerBillSensor(BasePowerEntity, SensorEntity):
+    """The last bill of one billing account: energy service or battery membership."""
+
+    def __init__(
+        self,
+        coordinator: BasePowerCoordinator,
+        entry: BasePowerConfigEntry,
+        account_type: str,
+    ) -> None:
+        super().__init__(coordinator, entry)
+        self._account_type = account_type
+        self.entity_description = BILL_SENSORS[account_type]
+        self._attr_unique_id = f"{coordinator.address_id}_{self.entity_description.key}"
+
+    def _account(self) -> Account | None:
+        return next(
+            (a for a in self.coordinator.accounts if a.account_type == self._account_type), None
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        account = self._account()
+        return None if account is None else account.last_bill
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        account = self._account()
+        return (account.currency if account else None) or self.hass.config.currency
+
+    @property
+    def available(self) -> bool:
+        """Bills do not depend on the battery's telemetry, only on the account."""
+        return self._account() is not None

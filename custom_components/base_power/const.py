@@ -21,6 +21,12 @@ MIN_SCAN_INTERVAL_SECONDS = 15
 # since the on-grid snapshot carries no state of charge.
 BACKUP_REFERENCE_KW = 0.75
 
+# Hourly energy and cost arrive as completed hours; the last 24 are re-read
+# this often and written to long-term statistics.
+ENERGY_INTERVAL = timedelta(minutes=30)
+# Bills change monthly.
+BILLING_INTERVAL = timedelta(hours=6)
+
 MANUFACTURER = "Base Power"
 
 ISSUE_TELEMETRY_UNAVAILABLE = "telemetry_unavailable"

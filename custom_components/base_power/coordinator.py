@@ -7,7 +7,9 @@ no push channel; the app polls too.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+import time
+from datetime import datetime, timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -15,8 +17,10 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import (
+    Account,
     BasePowerAuthError,
     BasePowerClient,
     BasePowerError,
@@ -25,13 +29,16 @@ from .api import (
 )
 from .clerk import ClerkAuthError, ClerkSessionProvider
 from .const import (
+    BILLING_INTERVAL,
     CONF_ADDRESS_ID,
     CONF_CLIENT_JWT,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    ENERGY_INTERVAL,
     ISSUE_TELEMETRY_UNAVAILABLE,
     silent_polls_before_issue,
 )
+from .hourly_statistics import async_import
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,6 +73,17 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
         # still gets a log line rather than looking like no transition.
         self._telemetry_available: bool | None = None
         self._silent_polls = 0
+        # Billing accounts, read at setup when the site declares billing.
+        self.accounts: list[Account] = []
+        # Rows written per series by the last energy import, for diagnostics.
+        self.energy_rows: dict[str, int] = {}
+        self.energy_imported_at: datetime | None = None
+        # Monotonic deadlines. Infinite until setup has read the capabilities,
+        # which decide whether the solar series exist.
+        self._energy_next = float("inf")
+        self._billing_next = float("inf")
+        self._running: set[str] = set()
+        self._failing: set[str] = set()
 
     async def async_load_capabilities(self) -> None:
         """Ask the site what it has, before any entity is created.
@@ -82,6 +100,85 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
                 "capability-gated entities",
                 err,
             )
+
+    async def async_load_accounts(self) -> None:
+        """Read the billing accounts, before the bill sensors are created.
+
+        Not fatal, like the capabilities: a site whose accounts cannot be read
+        keeps every battery sensor and gets no bill sensors.
+        """
+        if not self.capabilities.billing:
+            return
+        await self._async_refresh_accounts()
+
+    def async_start_extras(self) -> None:
+        """Start the energy import, and the billing refresh, once setup is done."""
+        self._energy_next = 0.0
+        if self.capabilities.billing:
+            self._billing_next = time.monotonic() + BILLING_INTERVAL.total_seconds()
+        self._schedule_extras()
+
+    def _schedule_extras(self) -> None:
+        now = time.monotonic()
+        if self.config_entry is None:
+            return
+        if now >= self._energy_next and "energy" not in self._running:
+            self._energy_next = now + ENERGY_INTERVAL.total_seconds()
+            self.config_entry.async_create_background_task(
+                self.hass, self._async_run("energy", self._async_import_energy), "base_power energy"
+            )
+        if now >= self._billing_next and "billing" not in self._running:
+            self._billing_next = now + BILLING_INTERVAL.total_seconds()
+            self.config_entry.async_create_background_task(
+                self.hass,
+                self._async_run("billing", self._async_refresh_accounts),
+                "base_power billing",
+            )
+
+    async def _async_run(self, name: str, job: Any) -> None:
+        self._running.add(name)
+        try:
+            await job()
+        finally:
+            self._running.discard(name)
+
+    def _note_extra(self, name: str, err: Exception | None) -> None:
+        """Log an optional read failing, and recovering, once per transition."""
+        if err is None:
+            if name in self._failing:
+                self._failing.discard(name)
+                _LOGGER.info("Base Power %s data is readable again", name)
+            return
+        if name not in self._failing:
+            self._failing.add(name)
+            _LOGGER.warning("Could not read Base Power %s data: %s", name, err)
+
+    async def _async_refresh_accounts(self) -> None:
+        try:
+            accounts = await self.client.list_accounts(self.address_id)
+        except (BasePowerError, ClerkAuthError) as err:
+            self._note_extra("billing", err)
+            return
+        self._note_extra("billing", None)
+        self.accounts = accounts
+        self.async_update_listeners()
+
+    async def _async_import_energy(self) -> None:
+        # The recorder is an after-dependency; a configuration without it
+        # gets no statistics.
+        if "recorder" not in self.hass.config.components:
+            return
+        try:
+            overview = await self.client.get_daily_overview(self.address_id)
+        except (BasePowerError, ClerkAuthError) as err:
+            self._note_extra("energy", err)
+            return
+        self._note_extra("energy", None)
+        title = self.config_entry.title if self.config_entry else "Base Power"
+        self.energy_rows = await async_import(
+            self.hass, self.address_id, title, overview, self.capabilities.has_solar
+        )
+        self.energy_imported_at = dt_util.utcnow()
 
     def _note_telemetry(self, snapshot: BatterySnapshot) -> None:
         """Track the battery falling silent: log it, and raise a repair issue.
@@ -144,6 +241,11 @@ class BasePowerCoordinator(DataUpdateCoordinator[BatterySnapshot]):
             )
 
     async def _async_update_data(self) -> BatterySnapshot:
+        snapshot = await self._async_fetch_snapshot()
+        self._schedule_extras()
+        return snapshot
+
+    async def _async_fetch_snapshot(self) -> BatterySnapshot:
         try:
             snapshot = await self.client.get_snapshot(self.address_id)
             self._note_telemetry(snapshot)
