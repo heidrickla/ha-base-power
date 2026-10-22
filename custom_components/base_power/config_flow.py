@@ -28,6 +28,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_EMAIL, CONF_SCAN_INTERVAL
 from homeassistant.core import callback
+from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import BasePowerAuthError, BasePowerClient, BasePowerError
@@ -58,7 +59,15 @@ SIGN_IN_URL = "https://account.basepowercompany.com/sign-in"
 
 STEP_EMAIL = vol.Schema({vol.Required(CONF_EMAIL): str})
 STEP_CODE = vol.Schema({vol.Required("code"): str})
-STEP_MANUAL = vol.Schema({vol.Required(CONF_CLIENT_JWT): str})
+# The pasted credential is as good as the account, so it is masked on screen
+# and kept out of the browser's form history.
+STEP_MANUAL = vol.Schema(
+    {
+        vol.Required(CONF_CLIENT_JWT): selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD, autocomplete="off")
+        )
+    }
+)
 
 # Which error a failed sign-in shows, and crucially WHICH FORM it shows it on.
 # A wrong code re-shows the code form, because the code is still valid and

@@ -19,6 +19,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import selector
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.base_power.api import (
@@ -496,3 +497,17 @@ async def test_the_options_flow_refuses_an_interval_outside_the_range(
         await hass.config_entries.options.async_configure(
             result["flow_id"], {CONF_SCAN_INTERVAL: bad}
         )
+
+
+async def test_the_pasted_credential_field_is_masked(hass: HomeAssistant) -> None:
+    """The credential is as good as the account: masked on screen and kept out
+    of the browser's form history."""
+    result = await _start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "manual"}
+    )
+    assert result["step_id"] == "manual"
+    field = result["data_schema"].schema[CONF_CLIENT_JWT]
+    assert isinstance(field, selector.TextSelector)
+    assert field.config["type"] == selector.TextSelectorType.PASSWORD
+    assert field.config["autocomplete"] == "off"
