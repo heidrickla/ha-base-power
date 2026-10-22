@@ -30,7 +30,7 @@ Base Power has no password. Clerk emails a six-digit code, and the config flow d
 
 Home Assistant keeps the durable credential Clerk returns and mints short-lived tokens from it, the same way the mobile app does.
 
-A second menu option, "paste a credential", covers what the code route cannot: an account that signs in only with Google or Apple, an account with two-factor authentication, or a change at Clerk that breaks the code flow. It takes the `__client` cookie from a browser session, described in `docs/API.md`.
+A second menu option, "paste a credential", covers what the code route cannot: an account that signs in only with Google or Apple, an account with two-factor authentication, or a change at Clerk that breaks the code flow. It takes the `__client` cookie from a browser session, described in `docs/API.md`, in a masked field with autocomplete off.
 
 ## Supported devices
 
@@ -173,7 +173,7 @@ template:
 | No hourly statistics | The recorder is not loaded, or the overview could not be read, which is logged once until it recovers. |
 | Entities go unavailable for a few minutes, repeatedly | The battery is very likely on cellular rather than Wi-Fi. Enable the Battery Wi-Fi network diagnostic; if it is not connected, check the access point. Polling faster will not help. |
 | Everything is unavailable but the integration looks fine | Either the poll is failing or Base answered `telemetry_unavailable`. Battery state stays available and says which. Check the Wi-Fi before contacting Base: cellular fallback is the usual cause. Your backup is unaffected, since the battery still powers the house in an outage while it is not reporting. A repair notice appears after 30 minutes. |
-| Asked to sign in again | Base's sign-in session ended or was revoked; diagnostics show its start, last use and end under `sign_in_session`. Reauthentication re-sends a code to the stored address. A rate limit, timeout or server error from Base's sign-in service fails one poll and is retried; it never asks for a new sign-in. |
+| Asked to sign in again | Base's sign-in session ended or was revoked; diagnostics show its start, last use and end under `sign_in_session`. Reauthentication re-sends a code to the stored address and renews the entry's own site; a sign-in for a Base account that does not include that site is refused. A rate limit, timeout or server error from Base's sign-in service fails one poll and is retried; it never asks for a new sign-in. |
 | "Base Power is temporarily refusing sign-in attempts" | Clerk rate-limiting. Wait a few minutes; retrying immediately makes it worse. |
 | Sign-in fails and mentions Google, Apple or two-factor | The emailed-code route cannot complete those. Use the paste option. |
 
