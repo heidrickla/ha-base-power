@@ -364,6 +364,50 @@ async def test_reauth_reuses_the_remembered_address(
     assert mock_entry.data[CONF_CLIENT_JWT] == "a-fresh-credential"
 
 
+async def _reauth_with_locations(
+    hass: HomeAssistant, mock_entry: MockConfigEntry, locations: list[Location]
+):
+    mock_entry.add_to_hass(hass)
+    result = await mock_entry.start_reauth_flow(hass)
+    with patch(SIGNIN, return_value=_signin()):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    with (
+        patch(SIGNIN, return_value=_signin(finish="another-accounts-credential")),
+        patch(CLIENT, return_value=_client(locations=locations)),
+    ):
+        return await hass.config_entries.flow.async_configure(result["flow_id"], {"code": "123456"})
+
+
+async def test_reauth_with_another_accounts_credential_is_refused(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    """A sign-in that does not reach this entry's site must not replace its
+    credential, or the entry reads another site under the same statistics."""
+    result = await _reauth_with_locations(
+        hass, mock_entry, [Location(address_id="another-site", name="Elsewhere")]
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "unique_id_mismatch"
+    assert mock_entry.data[CONF_CLIENT_JWT] == CREDENTIAL
+    assert mock_entry.data[CONF_ADDRESS_ID] == ADDRESS_ID
+
+
+async def test_reauth_finds_this_entrys_site_among_several(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    """An account with two sites lists them in any order; reauth renews the
+    entry's own site, not whichever is listed first."""
+    result = await _reauth_with_locations(
+        hass,
+        mock_entry,
+        [Location(address_id="another-site", name="Elsewhere"), *LOCATIONS],
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert mock_entry.data[CONF_CLIENT_JWT] == "another-accounts-credential"
+    assert mock_entry.data[CONF_ADDRESS_ID] == ADDRESS_ID
+
+
 async def test_reauth_on_an_entry_with_no_email_asks_for_one(
     hass: HomeAssistant,
 ) -> None:

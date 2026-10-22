@@ -205,6 +205,14 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 # One site is the normal case; a second is a second entry.
                 location = locations[0]
+                if self.source == "reauth":
+                    # Reauth renews the site this entry reads, so pick it out
+                    # of the account's sites when it is there.
+                    reauth_entry = self._get_reauth_entry()
+                    location = next(
+                        (loc for loc in locations if loc.address_id == reauth_entry.unique_id),
+                        location,
+                    )
                 data: dict[str, Any] = {
                     CONF_CLIENT_JWT: credential,
                     CONF_ADDRESS_ID: location.address_id,
@@ -214,11 +222,14 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
                     # human-readable thing saying which account an entry is for.
                     data[CONF_EMAIL] = self._email
 
+                await self.async_set_unique_id(location.address_id)
                 if self.source == "reauth":
+                    # A credential for another Base account would otherwise
+                    # read a different site under this entry's statistics.
+                    self._abort_if_unique_id_mismatch()
                     return self.async_update_reload_and_abort(
                         self._get_reauth_entry(), data_updates=data
                     )
-                await self.async_set_unique_id(location.address_id)
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title=location.name or "Base Power", data=data)
         return None

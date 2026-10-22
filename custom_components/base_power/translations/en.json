@@ -48,7 +48,8 @@
     },
     "abort": {
       "already_configured": "That site is already set up.",
-      "reauth_successful": "Base Power was signed in again."
+      "reauth_successful": "Base Power was signed in again.",
+      "unique_id_mismatch": "That sign-in is for a Base account that does not include this site. Sign in with the account the site was set up with."
     }
   },
   "exceptions": {
