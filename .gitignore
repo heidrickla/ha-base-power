@@ -26,7 +26,8 @@ strings.*.txt
 creds.txt
 *session*.txt
 
-# Agent instruction files stay out of the published repo.
+# Agent instruction files and agent settings stay out of the published repo.
+.claude/
 AGENTS.md
 CLAUDE.md
 CONTRIBUTING.md
