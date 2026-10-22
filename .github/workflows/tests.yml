@@ -31,7 +31,7 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
 
@@ -40,7 +40,7 @@ jobs:
         run: |
           python -m venv .venv
           .venv/bin/python -m pip install --quiet --upgrade pip
-          .venv/bin/python -m pip install --quiet pytest pytest-asyncio ruff
+          .venv/bin/python -m pip install --quiet "pytest==9.0.3" "pytest-asyncio==1.4.0" "ruff==0.17.1"
 
       - name: Ruff
         timeout-minutes: 5
@@ -67,7 +67,7 @@ jobs:
       # pytest-homeassistant-custom-component from 0.13.317 needs >=3.14, and
       # on 3.13 pip resolves an OLD Home Assistant instead of refusing, so the
       # suite goes green against a version nobody runs.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.14"
 
