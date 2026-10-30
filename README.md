@@ -2,6 +2,12 @@
 
 A Home Assistant integration for Base Power home batteries: power flow, stored energy, backup time, grid outage alerts, the last bills, and hourly energy and cost for the Energy dashboard. It signs in to Base's cloud with the emailed code Base already uses, so there is no password to store and nothing to copy out of a browser.
 
+## Screenshots
+
+![The Sign in to Base Power setup screen asking for an email address](docs/images/setup.png)
+
+Setup asks for the email address on the Base account, and Base sends a six-digit code.
+
 ## Installation
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=heidrickla&repository=ha-base-power&category=integration)
