@@ -205,8 +205,12 @@ async def test_an_import_reads_its_baseline_after_queued_writes_commit(
     """The first import's rows are still queued, as just before a reload."""
     await async_wait_recording_done(hass)
     hold = _HoldQueue()
-    get_instance(hass).queue_task(hold)
-    await async_import(hass, "addr", "Home", _overview([(H[0], 1.0), (H[1], 2.0)]), False)
+    recorder = get_instance(hass)
+    recorder.queue_task(hold)
+    # The first import only has to leave its rows queued behind the hold; its
+    # own wait for a commit would sit out the hold's 10 s cap instead.
+    with patch.object(recorder, "async_get_commit_future", return_value=None):
+        await async_import(hass, "addr", "Home", _overview([(H[0], 1.0), (H[1], 2.0)]), False)
     second = hass.async_create_task(
         async_import(hass, "addr", "Home", _overview([(H[1], 2.0), (H[2], 3.0)]), False)
     )

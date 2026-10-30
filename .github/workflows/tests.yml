@@ -72,13 +72,15 @@ jobs:
           python-version: "3.14"
 
       # setup-python's interpreter uses the image's SQLite; the recorder needs
-      # 3.40.1 or later, so the version is printed.
+      # 3.40.1 or later, so the version is printed. uv installs the same
+      # packages as pip did (compared 2026-10-30) in a third of the time;
+      # 0.12.5 is the uv the harness itself pins.
       - name: Install
         timeout-minutes: 15
         run: |
           python -m venv .venv
-          .venv/bin/python -m pip install --quiet --upgrade pip
-          .venv/bin/python -m pip install --quiet \
+          .venv/bin/python -m pip install --quiet "uv==0.12.5"
+          .venv/bin/python -m uv pip install --quiet --python .venv/bin/python \
             "pytest-homeassistant-custom-component==0.13.365" \
             "mypy==1.18.2"
           .venv/bin/python -c "import sqlite3, sys; print(sys.version.split()[0], 'sqlite', sqlite3.sqlite_version)"
