@@ -1,12 +1,12 @@
 """Config flow for Base Power.
 
-Sign-in is passwordless, so the normal path is two steps: type the email, type
-the code Clerk sends. Nobody has to copy a cookie out of developer tools.
+Sign-in is passwordless, so the first screen asks for the email and the second
+for the code Clerk sends. Nobody has to copy a cookie out of developer tools.
 
-The pasted credential stays as a demoted second option because the email route
-cannot cover three cases: an account that signs in only with Google or Apple,
-an account with two-factor turned on, and a Clerk change that breaks the code
-flow before a fix can ship.
+The pasted credential is offered only once the email route has failed, because
+that route cannot cover three cases: an account that signs in only with Google
+or Apple, an account with two-factor turned on, and a Clerk change that breaks
+the code flow before a fix can ship.
 
 Either path stores the same thing. `entry.data` holds the durable Clerk client
 credential, so `ClerkSessionProvider`, the API client and the coordinator are
@@ -82,7 +82,7 @@ EMAIL_STEP_ERRORS: dict[type[Exception], str] = {
 
 
 class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Email and code by default; a pasted credential as the fallback."""
+    """Email and code first; a pasted credential once that has failed."""
 
     VERSION = 1
 
@@ -95,12 +95,27 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
     # -------------------------------------------------------------- entry
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        return self.async_show_menu(step_id="user", menu_options=["email", "manual"])
+        return await self.async_step_email()
+
+    async def async_step_signin_fallback(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """The code route cannot finish for this account: paste, or try another address."""
+        return self.async_show_menu(step_id="signin_fallback", menu_options=["manual", "email"])
+
+    def _email_form(self, errors: dict[str, str], typed: str | None = None) -> ConfigFlowResult:
+        # Keeps what was typed after an error, and the remembered address on reauth.
+        schema = STEP_EMAIL
+        suggested = typed or self._email
+        if suggested:
+            schema = self.add_suggested_values_to_schema(STEP_EMAIL, {CONF_EMAIL: suggested})
+        return self.async_show_form(step_id="email", data_schema=schema, errors=errors)
 
     # ---------------------------------------------------- email and code
 
     async def async_step_email(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
+        email: str | None = None
         if user_input is not None:
             email = user_input[CONF_EMAIL].strip()
             signin = ClerkSignIn(async_get_clientsession(self.hass))
@@ -109,10 +124,10 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
             except tuple(EMAIL_STEP_ERRORS) as err:
                 errors["base"] = EMAIL_STEP_ERRORS[type(err)]
             except ClerkSignInError as err:
-                # Covers the social-only and two-factor accounts, which is
-                # exactly when someone should be sent to the manual path.
+                # The social-only and two-factor accounts, which is exactly
+                # when the paste route is the answer.
                 _LOGGER.debug("Base Power sign-in could not start: %s", err)
-                errors["base"] = "signin_failed"
+                return await self.async_step_signin_fallback()
             except Exception:
                 _LOGGER.exception("unexpected error starting the Base Power sign-in")
                 errors["base"] = "unknown"
@@ -120,7 +135,7 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._email = email
                 return await self.async_step_code()
 
-        return self.async_show_form(step_id="email", data_schema=STEP_EMAIL, errors=errors)
+        return self._email_form(errors, email)
 
     async def async_step_code(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -136,14 +151,12 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_code"
             except (ClerkCodeExpired, ClerkRateLimited) as err:
                 self._attempt = None
-                return self.async_show_form(
-                    step_id="email",
-                    data_schema=STEP_EMAIL,
-                    errors={"base": EMAIL_STEP_ERRORS[type(err)]},
-                )
+                return self._email_form({"base": EMAIL_STEP_ERRORS[type(err)]})
             except ClerkSignInError as err:
+                # Two-factor, or a Clerk change: retyping the code cannot help.
                 _LOGGER.debug("Base Power sign-in did not complete: %s", err)
-                errors["base"] = "signin_failed"
+                self._attempt = None
+                return await self.async_step_signin_fallback()
             except Exception:
                 _LOGGER.exception("unexpected error completing the Base Power sign-in")
                 errors["base"] = "unknown"
@@ -259,8 +272,9 @@ class BasePowerConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._attempt = await signin.async_start(self._email)
             except tuple(EMAIL_STEP_ERRORS) as err:
                 errors["base"] = EMAIL_STEP_ERRORS[type(err)]
-            except ClerkSignInError:
-                errors["base"] = "signin_failed"
+            except ClerkSignInError as err:
+                _LOGGER.debug("Base Power reauth could not start: %s", err)
+                return await self.async_step_signin_fallback()
             except Exception:
                 _LOGGER.exception("unexpected error starting the Base Power reauth")
                 errors["base"] = "unknown"

@@ -1,12 +1,26 @@
 # ha-base-power
 
-A Home Assistant integration for Base Power home batteries, and the reverse-engineering record it is built on.
+A Home Assistant integration for Base Power home batteries: power flow, stored energy, backup time, grid outage alerts, the last bills, and hourly energy and cost for the Energy dashboard. It signs in to Base's cloud with the emailed code Base already uses, so there is no password to store and nothing to copy out of a browser.
 
-Base ships no public API and no local interface. The contract here was recovered from the Android app (`com.basepowercompany.basemobileapp` 1.14.0), which is React Native on Hermes and talks Connect RPC to `https://dashboard.baseapis.net` with a Clerk session token.
+## Installation
 
-- [docs/API.md](docs/API.md): the recovered contract. Transport, auth, every service and method, the message fields, and what each maps to.
-- [proto/](proto/): the `dashboard.mobile.v2` `.proto` files, decoded from the descriptors the app embeds. Authoritative field list.
-- [tools/decode_descriptors.py](tools/decode_descriptors.py): recovers those files from a Hermes bundle's string table.
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=heidrickla&repository=ha-base-power&category=integration)
+
+1. Press the button above. HACS offers to add this repository; add it, then Download, and restart Home Assistant when it asks.
+2. Press this button to start the setup:
+
+[![Open your Home Assistant instance and start setting up Base Power.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=base_power)
+
+Base Power has no password. The setup is two screens:
+
+1. Sign in to Base Power: enter the email address on your Base account. Base emails a six-digit code.
+2. Enter your code: type the code. The integration finds your site and creates the device.
+
+Home Assistant keeps the durable credential Base's sign-in service returns and mints short-lived tokens from it, the same way the mobile app does.
+
+If Base cannot sign the account in with a code, which happens with an account that signs in only with Google or Apple and with one that has two-factor authentication, the setup says so and offers to paste a credential instead. That takes the `__client` cookie from a browser where you are signed in to Base, in a masked field with autocomplete off; `docs/API.md` describes the cookie. The same screen leads back to the email form.
+
+Without the buttons: HACS, the three-dot menu, Custom repositories, add `https://github.com/heidrickla/ha-base-power` as an Integration, download Base Power and restart; then Settings, Devices & services, Add integration, Base Power. Manual install: copy `custom_components/base_power` into your configuration's `custom_components` folder and restart.
 
 ## Accuracy
 
@@ -19,18 +33,6 @@ Three cross-checks on one installation:
 | Another vendor | `to_home` within 1.9% of a whole-panel CT monitor on the same house, which shares no code path with this integration |
 
 `docs/API.md` separates what the live service returned from what was read out of the app binary.
-
-## Setting it up
-
-Base Power has no password. Clerk emails a six-digit code, and the config flow does that for you:
-
-1. Add the integration and choose "Sign in with an emailed code".
-2. Enter the email address on your Base account.
-3. Enter the code they send.
-
-Home Assistant keeps the durable credential Clerk returns and mints short-lived tokens from it, the same way the mobile app does.
-
-A second menu option, "paste a credential", covers what the code route cannot: an account that signs in only with Google or Apple, an account with two-factor authentication, or a change at Clerk that breaks the code flow. It takes the `__client` cookie from a browser session, described in `docs/API.md`, in a masked field with autocomplete off.
 
 ## Supported devices
 
@@ -175,13 +177,21 @@ template:
 | Everything is unavailable but the integration looks fine | Either the poll is failing or Base answered `telemetry_unavailable`. Battery state stays available and says which. Check the Wi-Fi before contacting Base: cellular fallback is the usual cause. Your backup is unaffected, since the battery still powers the house in an outage while it is not reporting. A repair notice appears after 30 minutes. |
 | Asked to sign in again | Base's sign-in session ended or was revoked; diagnostics show its start, last use and end under `sign_in_session`. Reauthentication re-sends a code to the stored address and renews the entry's own site; a sign-in for a Base account that does not include that site is refused. A rate limit, timeout or server error from Base's sign-in service fails one poll and is retried; it never asks for a new sign-in. |
 | "Base Power is temporarily refusing sign-in attempts" | Clerk rate-limiting. Wait a few minutes; retrying immediately makes it worse. |
-| Sign-in fails and mentions Google, Apple or two-factor | The emailed-code route cannot complete those. Use the paste option. |
+| Sign in another way appears after the email or the code | Base cannot sign this account in with an emailed code: Google or Apple sign-in, or two-factor authentication. Paste a credential, or try another email address. |
 
 Diagnostics are available from the entry menu. They contain no credential, no Wi-Fi network name, and the address id only as a short digest. `sign_in_session` carries Clerk's times for the stored session: `created_at`, `last_active_at`, `expire_at` and `abandon_at`.
 
 ## Removing it
 
 Delete the config entry from Settings > Devices & services. That removes the device, its entities and the stored credential. Nothing is changed at Base: the Home Assistant session is one of several on the account and ending it does not affect the app. To revoke access at Base's end, sign out of all sessions from your Base account.
+
+## How it was built
+
+Base ships no public API and no local interface. The contract here was recovered from the Android app (`com.basepowercompany.basemobileapp` 1.14.0), which is React Native on Hermes and talks Connect RPC to `https://dashboard.baseapis.net` with a Clerk session token.
+
+- [docs/API.md](docs/API.md): the recovered contract. Transport, auth, every service and method, the message fields, and what each maps to.
+- [proto/](proto/): the `dashboard.mobile.v2` `.proto` files, decoded from the descriptors the app embeds. Authoritative field list.
+- [tools/decode_descriptors.py](tools/decode_descriptors.py): recovers those files from a Hermes bundle's string table.
 
 ## Scope and conduct
 

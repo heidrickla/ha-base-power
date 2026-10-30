@@ -1,17 +1,9 @@
 {
   "config": {
     "step": {
-      "user": {
-        "title": "Base Power",
-        "description": "How would you like to sign in?",
-        "menu_options": {
-          "email": "Sign in with an emailed code",
-          "manual": "Paste a credential from the browser (advanced)"
-        }
-      },
       "email": {
         "title": "Sign in to Base Power",
-        "description": "Base Power has no password. Enter the email address on your Base account and they will send you a six-digit code.",
+        "description": "Base Power has no password. Enter the email address on your Base account and they will send you a six-digit code. If you sign in to Base with Google or Apple, enter that email anyway: the next screen offers another way.",
         "data": {
           "email": "Email address"
         }
@@ -21,6 +13,14 @@
         "description": "Base Power emailed a six-digit code to {email}. It expires after a few minutes.",
         "data": {
           "code": "Code"
+        }
+      },
+      "signin_fallback": {
+        "title": "Sign in another way",
+        "description": "Base Power could not sign this account in with an emailed code. That happens with an account that signs in with Google or Apple, and with one that has two-factor authentication turned on. Paste a credential from a browser where you are signed in to Base instead, or try another email address.",
+        "menu_options": {
+          "manual": "Paste a credential from the browser",
+          "email": "Try another email address"
         }
       },
       "manual": {
@@ -40,7 +40,6 @@
       "invalid_code": "That code was not correct. Check the email and try again; the code is still valid.",
       "code_expired": "That code has expired or has been tried too many times. Start again to get a new one.",
       "too_many_requests": "Base Power is temporarily refusing sign-in attempts for this account. Wait a few minutes before trying again.",
-      "signin_failed": "Sign-in could not be completed. If this account uses Google, Apple or two-factor authentication, go back and use the paste option instead.",
       "invalid_auth": "Base Power rejected that credential. Check it was copied whole, and that it is the `__client` cookie rather than `__session`.",
       "cannot_connect": "Could not reach the Base Power API.",
       "no_locations": "That account signed in, but has no sites on it.",

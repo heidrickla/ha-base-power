@@ -48,9 +48,9 @@ rules:
   config-flow-test-coverage:
     status: done
     comment: |
-      config_flow.py: 129 statements, 0 missed, 100%.
+      config_flow.py: 147 statements, 0 missed, 100%.
 
-      32 tests in tests/ha/test_config_flow.py, mostly error branches. This is
+      42 tests in tests/ha/test_config_flow.py, mostly error branches. This is
       the one part a user drives by hand, and its failures are expensive:
       requesting a code sends a real email, and a wrong-code path that
       re-requests will rate-limit the account.
@@ -62,8 +62,11 @@ rules:
       - an expired or rate-limited code returns to the email step, because
         retyping a dead code cannot work
       - each Clerk failure maps to its own message: unknown_email,
-        code_expired, too_many_requests, signin_failed, unknown. They tell the
-        user different things to do.
+        code_expired, too_many_requests, unknown. They tell the user different
+        things to do.
+      - an account the code route cannot sign in (social-only, two-factor,
+        at the email or the code) is offered the paste route, with a way back
+        to the email form; reauth reaches it the same way
       - invalid_auth against cannot_connect, which decides whether someone
         re-copies a credential or waits for Base to come back
       - a valid credential on an account with no sites is no_locations, not an
@@ -75,12 +78,13 @@ rules:
   config-flow:
     status: done
     comment: |
-      A menu, then email, then code: the integration performs Clerk's
-      passwordless sign-in itself rather than asking anyone to copy a cookie.
-      The credential is validated by a real ListLocations call before the
-      entry is created, and the site is discovered from that response rather
-      than typed. A pasted credential remains as a demoted second option for
-      social-only and two-factor accounts.
+      Email, then code: the integration performs Clerk's passwordless
+      sign-in itself rather than asking anyone to copy a cookie, and the
+      first screen asks only for the email. The credential is validated by a
+      real ListLocations call before the entry is created, and the site is
+      discovered from that response rather than typed. A pasted credential
+      is offered only after the code route fails, which is what social-only
+      and two-factor accounts do.
   dependency-transparency:
     status: done
     comment: |
@@ -99,9 +103,10 @@ rules:
   docs-installation-instructions:
     status: done
     comment: |
-      README has a Setting it up section: add the integration, choose the
-      emailed code, enter the address, enter the code. The fallback paste
-      path is described as a fallback and says when it is needed.
+      README has an Installation section: the HACS and add-integration
+      buttons, then the screens in order (email, code), the route without
+      buttons and the manual copy. The paste route is described as the
+      fallback it is and says when it appears.
   docs-removal-instructions:
     status: done
     comment: |

@@ -77,22 +77,31 @@ async def _start(hass: HomeAssistant):
     )
 
 
+async def _to_manual(hass: HomeAssistant):
+    """The paste route, reached the only way it is offered: after the code route failed."""
+    result = await _start(hass)
+    with patch(SIGNIN, return_value=_signin(start_error=ClerkSignInError("social only"))):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"email": EMAIL})
+    assert result["step_id"] == "signin_fallback"
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "manual"}
+    )
+
+
 # ------------------------------------------------------------ the happy path
 
 
-async def test_the_menu_offers_the_code_route_first(hass: HomeAssistant) -> None:
-    """Order is deliberate: the paste route needs DevTools and most people
-    should never see it."""
+async def test_the_first_screen_asks_only_for_the_email(hass: HomeAssistant) -> None:
+    """No menu first: the paste route needs DevTools and most people should
+    never see it."""
     result = await _start(hass)
-    assert result["type"] is FlowResultType.MENU
-    assert result["menu_options"] == ["email", "manual"]
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "email"
+    assert list(result["data_schema"].schema) == ["email"]
 
 
 async def test_email_then_code_creates_the_entry(hass: HomeAssistant) -> None:
     result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "email"}
-    )
     assert result["step_id"] == "email"
 
     with patch(SIGNIN, return_value=_signin()):
@@ -126,10 +135,7 @@ async def test_a_site_with_no_name_falls_back_to_the_literal_title(
     name, which becomes the entity id prefix. This is the case on the only
     production instance, so it decides what the README examples must say.
     """
-    result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "manual"}
-    )
+    result = await _to_manual(hass)
     unnamed = [Location(address_id=ADDRESS_ID, name=None)]
     with patch(CLIENT, return_value=_client(locations=unnamed)):
         result = await hass.config_entries.flow.async_configure(
@@ -143,9 +149,6 @@ async def test_the_email_is_stripped_before_use(hass: HomeAssistant) -> None:
     """Copy-paste from a mail client brings whitespace, and Clerk would treat
     ' a@b.test' as a different, unknown address."""
     result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "email"}
-    )
     signin = _signin()
     with patch(SIGNIN, return_value=signin):
         await hass.config_entries.flow.async_configure(result["flow_id"], {"email": f"  {EMAIL}  "})
@@ -161,11 +164,6 @@ async def test_the_email_is_stripped_before_use(hass: HomeAssistant) -> None:
         (ClerkUnknownEmail("no account"), "unknown_email"),
         (ClerkCodeExpired("too late"), "code_expired"),
         (ClerkRateLimited("slow down"), "too_many_requests"),
-        # Not in EMAIL_STEP_ERRORS: a 2FA account cannot finish this route at
-        # all, so it lands on the generic message that points at the paste
-        # option rather than one implying the code is nearly working.
-        (ClerkSecondFactorRequired("2fa"), "signin_failed"),
-        (ClerkSignInError("something else"), "signin_failed"),
         (RuntimeError("boom"), "unknown"),
     ],
 )
@@ -176,9 +174,6 @@ async def test_the_email_step_reports_each_failure_distinctly(
     them into one message would be the difference between 'use the other
     option' and 'wait five minutes'."""
     result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "email"}
-    )
     with patch(SIGNIN, return_value=_signin(start_error=error)):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {"email": EMAIL})
     assert result["type"] is FlowResultType.FORM
@@ -186,14 +181,40 @@ async def test_the_email_step_reports_each_failure_distinctly(
     assert result["errors"] == {"base": expected}
 
 
+async def test_the_email_form_keeps_what_was_typed_after_an_error(hass: HomeAssistant) -> None:
+    result = await _start(hass)
+    with patch(SIGNIN, return_value=_signin(start_error=ClerkUnknownEmail("no account"))):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"email": EMAIL})
+    field = next(iter(result["data_schema"].schema))
+    assert field.description == {"suggested_value": EMAIL}
+
+
+@pytest.mark.parametrize(
+    "error", [ClerkSecondFactorRequired("2fa"), ClerkSignInError("social only")]
+)
+async def test_an_account_the_code_route_cannot_sign_in_is_offered_the_paste_route(
+    hass: HomeAssistant, error: Exception
+) -> None:
+    """Social-only and two-factor accounts cannot finish the code route at all,
+    so the paste route appears here, and only here, with a way back."""
+    result = await _start(hass)
+    with patch(SIGNIN, return_value=_signin(start_error=error)):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"email": EMAIL})
+    assert result["type"] is FlowResultType.MENU
+    assert result["step_id"] == "signin_fallback"
+    assert result["menu_options"] == ["manual", "email"]
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "email"}
+    )
+    assert result["step_id"] == "email"
+
+
 # ---------------------------------------------------------- the code step's errors
 
 
 async def _to_code_step(hass: HomeAssistant):
     result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "email"}
-    )
     with patch(SIGNIN, return_value=_signin()):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {"email": EMAIL})
     return result
@@ -233,33 +254,39 @@ async def test_an_unusable_code_sends_the_user_back_to_request_another(
     assert result["errors"] == {"base": expected}
 
 
-@pytest.mark.parametrize(
-    "error,expected",
-    [
-        (ClerkSignInError("other"), "signin_failed"),
-        (RuntimeError("boom"), "unknown"),
-    ],
-)
-async def test_the_code_step_handles_the_remaining_failures(
-    hass: HomeAssistant, error: Exception, expected: str
+async def test_an_unexpected_code_step_error_stays_on_the_code_screen(
+    hass: HomeAssistant,
 ) -> None:
+    result = await _to_code_step(hass)
+    with patch(SIGNIN, return_value=_signin(finish_error=RuntimeError("boom"))):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"code": "123456"}
+        )
+    assert result["step_id"] == "code"
+    assert result["errors"] == {"base": "unknown"}
+
+
+@pytest.mark.parametrize(
+    "error", [ClerkSecondFactorRequired("2fa"), ClerkSignInError("did not complete")]
+)
+async def test_a_code_the_account_cannot_finish_with_offers_the_paste_route(
+    hass: HomeAssistant, error: Exception
+) -> None:
+    """Two-factor shows up only after the code; retyping it cannot help."""
     result = await _to_code_step(hass)
     with patch(SIGNIN, return_value=_signin(finish_error=error)):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"code": "123456"}
         )
-    assert result["step_id"] == "code"
-    assert result["errors"] == {"base": expected}
+    assert result["type"] is FlowResultType.MENU
+    assert result["step_id"] == "signin_fallback"
 
 
 # ------------------------------------------------------------- the manual path
 
 
 async def test_the_pasted_credential_creates_the_entry(hass: HomeAssistant) -> None:
-    result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "manual"}
-    )
+    result = await _to_manual(hass)
     assert result["step_id"] == "manual"
 
     with patch(CLIENT, return_value=_client()):
@@ -281,10 +308,7 @@ async def test_the_pasted_credential_creates_the_entry(hass: HomeAssistant) -> N
 async def test_the_manual_path_reports_validation_failures(
     hass: HomeAssistant, error: Exception | None, locations: list | None, expected: str
 ) -> None:
-    result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "manual"}
-    )
+    result = await _to_manual(hass)
     with patch(CLIENT, return_value=_client(locations=locations, error=error)):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_CLIENT_JWT: CREDENTIAL}
@@ -299,10 +323,7 @@ async def test_an_account_with_no_sites_is_not_an_auth_failure(
     """A valid credential on an account with nothing installed. Telling that
     user their credential is wrong would send them to re-copy a cookie that
     was never the problem."""
-    result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "manual"}
-    )
+    result = await _to_manual(hass)
     with patch(CLIENT, return_value=_client(locations=[])):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_CLIENT_JWT: CREDENTIAL}
@@ -319,10 +340,7 @@ async def test_the_same_site_cannot_be_added_twice(
     """Scoped by address id, so a second entry for one battery is a duplicate
     even if the credential differs - the same account on two browsers."""
     mock_entry.add_to_hass(hass)
-    result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "manual"}
-    )
+    result = await _to_manual(hass)
     with patch(CLIENT, return_value=_client()):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_CLIENT_JWT: "a-different-credential"}
@@ -424,6 +442,21 @@ async def test_reauth_on_an_entry_with_no_email_asks_for_one(
     assert result["step_id"] == "email"
 
 
+async def test_another_email_from_the_reauth_fallback_is_offered_the_stored_one(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    mock_entry.add_to_hass(hass)
+    result = await mock_entry.start_reauth_flow(hass)
+    with patch(SIGNIN, return_value=_signin(start_error=ClerkSignInError("social only"))):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "email"}
+    )
+    assert result["step_id"] == "email"
+    field = next(iter(result["data_schema"].schema))
+    assert field.description == {"suggested_value": EMAIL}
+
+
 async def test_a_reauth_failure_is_reported_on_the_confirm_screen(
     hass: HomeAssistant, mock_entry: MockConfigEntry
 ) -> None:
@@ -435,22 +468,37 @@ async def test_a_reauth_failure_is_reported_on_the_confirm_screen(
     assert result["errors"] == {"base": "too_many_requests"}
 
 
-@pytest.mark.parametrize(
-    "error,expected",
-    [
-        (ClerkSignInError("other"), "signin_failed"),
-        (RuntimeError("boom"), "unknown"),
-    ],
-)
-async def test_reauth_handles_the_remaining_failures(
-    hass: HomeAssistant, mock_entry: MockConfigEntry, error: Exception, expected: str
+async def test_an_unexpected_reauth_error_stays_on_the_confirm_screen(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
 ) -> None:
     mock_entry.add_to_hass(hass)
     result = await mock_entry.start_reauth_flow(hass)
-    with patch(SIGNIN, return_value=_signin(start_error=error)):
+    with patch(SIGNIN, return_value=_signin(start_error=RuntimeError("boom"))):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["step_id"] == "reauth_confirm"
-    assert result["errors"] == {"base": expected}
+    assert result["errors"] == {"base": "unknown"}
+
+
+async def test_reauth_of_an_account_the_code_route_cannot_sign_in_pastes_a_credential(
+    hass: HomeAssistant, mock_entry: MockConfigEntry
+) -> None:
+    """A social-only account set up by pasting renews the same way, and the
+    renewed credential lands on this entry."""
+    mock_entry.add_to_hass(hass)
+    result = await mock_entry.start_reauth_flow(hass)
+    with patch(SIGNIN, return_value=_signin(start_error=ClerkSignInError("social only"))):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["step_id"] == "signin_fallback"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "manual"}
+    )
+    with patch(CLIENT, return_value=_client()):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_CLIENT_JWT: "a-pasted-credential"}
+        )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert mock_entry.data[CONF_CLIENT_JWT] == "a-pasted-credential"
 
 
 # ------------------------------------------------------- credential validation
@@ -473,10 +521,7 @@ async def test_a_credential_that_does_not_work_says_which_kind_of_failure(
     """invalid_auth tells the user to get a new credential; cannot_connect
     tells them to wait. Getting these the wrong way round sends someone
     re-copying a cookie while Base is simply down."""
-    result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "manual"}
-    )
+    result = await _to_manual(hass)
     with patch(CLIENT, return_value=_client(error=error)):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_CLIENT_JWT: CREDENTIAL}
@@ -492,9 +537,6 @@ async def test_submitting_a_code_with_no_attempt_returns_to_the_email_step(
     recover to somewhere usable - raising would abandon a flow the user can
     still complete."""
     result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "email"}
-    )
     with patch(SIGNIN, return_value=_signin()):
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {"email": EMAIL})
 
@@ -546,10 +588,7 @@ async def test_the_options_flow_refuses_an_interval_outside_the_range(
 async def test_the_pasted_credential_field_is_masked(hass: HomeAssistant) -> None:
     """The credential is as good as the account: masked on screen and kept out
     of the browser's form history."""
-    result = await _start(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": "manual"}
-    )
+    result = await _to_manual(hass)
     assert result["step_id"] == "manual"
     field = result["data_schema"].schema[CONF_CLIENT_JWT]
     assert isinstance(field, selector.TextSelector)

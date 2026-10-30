@@ -129,12 +129,21 @@ def main() -> int:
     )
 
     # ------------------------------------------------ strings/translations
-    strings = load_json(COMPONENT / "strings.json") or {}
-    en = load_json(COMPONENT / "translations" / "en.json") or {}
-    check(strings == en, "strings.json and translations/en.json have diverged")
+    # A custom integration ships translations/en.json alone: hassfest validates
+    # that file, and a strings.json beside it is a second copy that drifts.
+    check(
+        not (COMPONENT / "strings.json").exists(),
+        "strings.json must not ship: translations/en.json is the source",
+    )
+    strings = load_json(COMPONENT / "translations" / "en.json") or {}
+    check(bool(strings), "translations/en.json is missing or empty")
+    check(
+        "[%key:" not in json.dumps(strings),
+        "translations/en.json holds a [%key:...] reference, which ships as literal text",
+    )
 
-    # Every translation_key used in code must exist in strings.json, and every
-    # entity entry in strings.json must be used. Either direction failing is a
+    # Every translation_key used in code must exist in en.json, and every
+    # entity entry in en.json must be used. Either direction failing is a
     # user-visible name that silently falls back to the entity id.
     declared: set[str] = set()
     for domain_block in (strings.get("entity") or {}).values():
@@ -154,9 +163,9 @@ def main() -> int:
     unused_strings = declared - used
     check(
         not missing_strings,
-        f"translation keys used but not in strings.json: {sorted(missing_strings)}",
+        f"translation keys used but not in en.json: {sorted(missing_strings)}",
     )
-    check(not unused_strings, f"strings.json entries nothing uses: {sorted(unused_strings)}")
+    check(not unused_strings, f"en.json entries nothing uses: {sorted(unused_strings)}")
 
     # ------------------------------------------------- reserved ENUM states
     for domain_block in (strings.get("entity") or {}).values():
@@ -232,11 +241,11 @@ def main() -> int:
     raised = translated_raises - set(strings.get("issues") or {})
     check(
         not (raised - declared_exceptions),
-        f"exceptions raised but not in strings.json: {sorted(raised - declared_exceptions)}",
+        f"exceptions raised but not in en.json: {sorted(raised - declared_exceptions)}",
     )
     check(
         not (declared_exceptions - raised),
-        f"strings.json declares exceptions nothing raises: {sorted(declared_exceptions - raised)}",
+        f"en.json declares exceptions nothing raises: {sorted(declared_exceptions - raised)}",
     )
     all_source = "\n".join(p.read_text(encoding="utf-8") for p in COMPONENT.glob("*.py"))
     for key, entry in (strings.get("exceptions") or {}).items():
