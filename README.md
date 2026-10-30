@@ -19,12 +19,12 @@ Setup asks for the email address on the Base account, and Base sends a six-digit
 
 Base Power has no password. The setup is two screens:
 
-1. Sign in to Base Power: enter the email address on your Base account. Base emails a six-digit code.
+1. Sign in to Base Power: enter the email address on your Base account. Base emails a six-digit code. After an error the form keeps the address you typed, and on reauthentication it offers the stored one.
 2. Enter your code: type the code. The integration finds your site and creates the device.
 
 Home Assistant keeps the durable credential Base's sign-in service returns and mints short-lived tokens from it, the same way the mobile app does.
 
-If Base cannot sign the account in with a code, which happens with an account that signs in only with Google or Apple and with one that has two-factor authentication, the setup says so and offers to paste a credential instead. That takes the `__client` cookie from a browser where you are signed in to Base, in a masked field with autocomplete off; `docs/API.md` describes the cookie. The same screen leads back to the email form.
+If Base cannot sign the account in with a code, which happens with an account that signs in only with Google or Apple and with one that has two-factor authentication, the setup says so and offers to paste a credential instead. That takes the `__client` cookie from a browser where you are signed in to Base, in a masked field with autocomplete off; `docs/API.md` describes the cookie. The same screen leads back to the email form. Reauthentication reaches the paste screen the same way, so an entry set up by pasting is renewed by pasting.
 
 Without the buttons: HACS, the three-dot menu, Custom repositories, add `https://github.com/heidrickla/ha-base-power` as an Integration, download Base Power and restart; then Settings, Devices & services, Add integration, Base Power. Manual install: copy `custom_components/base_power` into your configuration's `custom_components` folder and restart.
 
