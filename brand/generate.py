@@ -1,17 +1,7 @@
 """Brand asset generator for the Base Power integration.
 
-The art is a stylized front view of the actual device - Base's wall-mounted home
-battery, the stacked cabinet that appears in their own app render - rather than
-their "BASE" wordmark. Two reasons: the wordmark is their trademark and a
-generated approximation of one tends to look wrong, and the estate's own
-precedent is the device (see ha-tuxedo-touch/brand/README.md).
-
-Drawn programmatically with Pillow, rendered at 4x and downsampled, so the edges
-stay clean at 256 px without shipping a hand-drawn master.
-
-The palette has to survive BOTH Home Assistant themes. A white cabinet on
-transparency disappears on a light theme and a dark one disappears on dark, so
-the body carries its own dark outline and the light panels sit inside it.
+The icons are resized from icon-source.png. The wide logos retain the
+programmatically drawn device and wordmark.
 
     python generate.py            # contact sheet to preview/, nothing shipped
     python generate.py --final    # write the PNGs into custom_components/
@@ -28,11 +18,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "custom_components", "base_power", "brand")
 PREVIEW = os.path.join(HERE, "preview")
 
-SLATE = (38, 45, 56, 255)        # outline / body edge, reads on light themes
-PANEL = (242, 244, 246, 255)     # cabinet face, reads on dark themes
+SLATE = (38, 45, 56, 255)  # outline / body edge, reads on light themes
+PANEL = (242, 244, 246, 255)  # cabinet face, reads on dark themes
 PANEL_SHADE = (214, 219, 225, 255)
 SEAM = (168, 176, 186, 255)
-ENERGY = (0, 176, 132, 255)      # charge bolt
+ENERGY = (0, 176, 132, 255)  # charge bolt
 ENERGY_DIM = (0, 140, 106, 255)
 
 
@@ -59,12 +49,10 @@ def draw_battery(size: int) -> Image.Image:
     inset = edge + int(size * 0.012)
     for i in (1, 2):
         y = y0 + int(h * i / 3.0)
-        d.line([x0 + inset, y, x0 + w - inset, y], fill=SEAM,
-               width=max(1, int(size * 0.012)))
+        d.line([x0 + inset, y, x0 + w - inset, y], fill=SEAM, width=max(1, int(size * 0.012)))
 
     # A shaded strip down the right gives it depth without a gradient.
-    d.rectangle([x0 + w - int(w * 0.22), y0 + edge,
-                 x0 + w - edge, y0 + h - edge], fill=PANEL_SHADE)
+    d.rectangle([x0 + w - int(w * 0.22), y0 + edge, x0 + w - edge, y0 + h - edge], fill=PANEL_SHADE)
     _rounded(d, [x0, y0, x0 + w, y0 + h], r, None, SLATE, edge)
 
     # Wall bracket feet, so it reads as wall-mounted rather than floating.
@@ -136,28 +124,28 @@ def make_logo(dark: bool = False, master_h: int = 512) -> Image.Image:
     gap = d.textlength(" ", font=f1)
     y1 = int(h * 0.28)
     d.text((tx, y1), "Base", font=f1, fill=fg)
-    d.text((tx + d.textlength("Base", font=f1) + gap, y1), "Power",
-           font=f1, fill=ENERGY)
+    d.text((tx + d.textlength("Base", font=f1) + gap, y1), "Power", font=f1, fill=ENERGY)
 
     sub = "HOME BATTERY"
     f2, _ = _fit(d, [sub], avail, int(h * 0.14))
-    d.text((tx, y1 + int(f1.size * 1.18)), sub, font=f2,
-           fill=(fg[0], fg[1], fg[2], 170))
+    d.text((tx, y1 + int(f1.size * 1.18)), sub, font=f2, fill=(fg[0], fg[1], fg[2], 170))
     return img
 
 
 def _save(img: Image.Image, path: str, target_short: int) -> None:
     short = min(img.size)
     scale = target_short / short
-    out = img.resize((max(1, round(img.width * scale)),
-                      max(1, round(img.height * scale))), Image.LANCZOS)
+    out = img.resize(
+        (max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS
+    )
     os.makedirs(os.path.dirname(path), exist_ok=True)
     out.save(path, optimize=True)
-    print("   %-46s %d x %d" % (os.path.relpath(path, HERE), out.width, out.height))
+    print(f"   {os.path.relpath(path, HERE):46s} {out.width} x {out.height}")
 
 
 def final() -> None:
-    icon = make_icon()
+    with Image.open(os.path.join(HERE, "icon-source.png")) as original:
+        icon = original.convert("RGBA")
     _save(icon, os.path.join(OUT, "icon.png"), 256)
     _save(icon, os.path.join(OUT, "icon@2x.png"), 512)
     logo = make_logo(dark=False)
@@ -171,9 +159,13 @@ def final() -> None:
 def sheet() -> None:
     """Contact sheet on both theme backgrounds, because that is the real test."""
     os.makedirs(PREVIEW, exist_ok=True)
-    tiles = [("icon", make_icon().resize((256, 256), Image.LANCZOS)),
-             ("logo", make_logo(False).resize((512, 256), Image.LANCZOS)),
-             ("dark_logo", make_logo(True).resize((512, 256), Image.LANCZOS))]
+    with Image.open(os.path.join(HERE, "icon-source.png")) as original:
+        icon = original.convert("RGBA")
+    tiles = [
+        ("icon", icon.resize((256, 256), Image.LANCZOS)),
+        ("logo", make_logo(False).resize((512, 256), Image.LANCZOS)),
+        ("dark_logo", make_logo(True).resize((512, 256), Image.LANCZOS)),
+    ]
     w = 256 + 512 + 512 + 64
     s = Image.new("RGBA", (w, 560), (255, 255, 255, 255))
     d = ImageDraw.Draw(s)
@@ -185,7 +177,7 @@ def sheet() -> None:
         x += im.width + 16
     p = os.path.join(PREVIEW, "contact_sheet.png")
     s.save(p, optimize=True)
-    print("   preview: %s" % p)
+    print(f"   preview: {p}")
 
 
 if __name__ == "__main__":
